@@ -95,6 +95,14 @@ p4 <- p_sell + p_serv + an
 
 
 
+total %>% ggplot(aes(income/1000)) + geom_histogram()
+total %>% ggplot(aes(max_unpaid/1000)) + geom_histogram()
+
+
+
+
+
+
 
 
 m1 <- data %>% group_by(seller) %>% filter(n() > 5000) %>% mutate(nn = n()) %>% 
@@ -141,6 +149,45 @@ m5 <- data %>% group_by(delic_date, new_homeowner) %>%
   facet_wrap(~new_homeowner, scales="free", nrow=3) +
   thd + an
 
+
+
+
+m6 <- data %>% group_by(delic_date, new_homeowner) %>% 
+  summarize(n = sum(delic_mean)) %>% 
+  ggplot(aes(delic_date, n)) + 
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(span = 0.25, color=base) + 
+  thd + an
+
+p_sca1 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_brewer(palette="Paired") +
+  scale_x_date(date_breaks = "2 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency binary", x=NULL,y=NULL) +
+  geom_point(alpha=0.2) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey90") + thd 
+
+p_sca2 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_mean)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_brewer(palette="Paired") +
+  scale_x_date(date_breaks = "2 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency sum", x=NULL,y=NULL) +
+  geom_point(alpha=0.2) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey90") + thd 
+
+m7 <- p_sca1 + p_sca2 + an + plot_layout(guides = "collect")
 
 
 
@@ -231,6 +278,7 @@ ggsave(m1, filename = "plots/m1.pdf", width=12, height=5, dpi=300)
 ggsave(m2, filename = "plots/m2.pdf", width=12, height=3, dpi=300)
 ggsave(m3, filename = "plots/m3.pdf", width=20, height=12, dpi=300)
 ggsave(m4, filename = "plots/m4.pdf", width=12, height=5, dpi=300)
+ggsave(m7, filename = "plots/m7.pdf", width=12, height=5, dpi=300)
 
 ggsave(n1, filename = "plots/n1.pdf", width=12, height=7, dpi=300)
 ggsave(n2, filename = "plots/n2.pdf", width=12, height=5, dpi=300)
@@ -238,21 +286,41 @@ ggsave(n2, filename = "plots/n2.pdf", width=12, height=5, dpi=300)
 
 
 
+library(openintro)
+
+states_map <- map_data("state")
+dat <- data %>% group_by(state) %>% summarize(n=n()) %>% 
+  mutate(region = tolower(abbr2state(state)))
+
+ggplot(dat, aes(map_id = region)) +
+  geom_map(aes(fill = n), map = states_map) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(title="US" , x=NULL, y=NULL, fill="Loans")
 
 
+library(zipcode)
+data("zipcode")
+
+dat <- data %>% group_by(postal_code) %>% summarize(n=n()) %>% mutate(zip = substr(postal_code,1,3))
+zipcode$zip <- substr(zipcode$zip, 1, 3)
+zipcode$lat <- zipcode$latitude
+
+ggplot(dat, aes(map_id = zip)) +
+  geom_map(aes(fill = n, x=latitude, y=longitude), map = zipcode)
 
 
 
 
 #predict -----------------------------------------------------------------
 
+data2 <- sample_n(data, 5000)
+
+
 library(caret)
 
-
-
-index    <- createDataPartition(data$delic_binary, p = 0.75, list = FALSE)
-training <- data[index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
-test     <- data[-index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
+index    <- createDataPartition(data2$delic_binary, p = 0.75, list = FALSE)
+training <- data2[index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
+test     <- data2[-index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
 
 
 
@@ -261,11 +329,20 @@ cv <- trainControl(method = "cv", number = 5)
 fit_glm <- train(as.factor(delic_binary)     ~ .,
                  data      = training,
                  trControl = cv, 
+                 alpha = 0.5,
+                 lambda = 0.1,
                  method    = "glmnet", 
                  metric    = "Accuracy",
                  na.action=na.exclude)
 
 table(predict(fit_glm, newdata=test), test$delic_binary)
+
+
+
+
+
+
+
 
 
 
