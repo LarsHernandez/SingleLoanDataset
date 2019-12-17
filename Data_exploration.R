@@ -1,6 +1,13 @@
 
 library(tidyverse)
 library(patchwork)
+library(openintro) #get state from abbr
+library(scales)
+library(tidygraph)
+library(ggraph)
+
+library(caret)
+
 # Advantages of Loan dataset
 # 1. big data 80+ GB
 # 2. use of models to predict delic
@@ -11,37 +18,22 @@ library(patchwork)
 
 load("Total.rdata")
 
-data <- Total
+data <- subset(total, !(state %in% c("VI", "GU", "PR")))
 
-# exploration -------------------------------------------------------------
+
+# Theme -------------------------------------------------------------------
 
 base <- "#08306b"
 
 th <- theme(plot.title  = element_text(size = 10),
-      plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
-      panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
-      legend.background = element_rect(fill = "#f3f3f3",       color = NA),
-      legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
-      strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
-      panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
-      panel.grid.major  = element_blank(), 
-      panel.grid.minor  = element_blank(),
-      title             = element_text(color = "black"),
-      plot.subtitle     = element_text(color = "grey40"),
-      plot.caption      = element_text(color = "grey70"),
-      strip.text        = element_text(face  = "bold"),
-      axis.text         = element_text(color = "black"),
-      axis.ticks        = element_line(color = "black"))
-
-thd <- theme(plot.title  = element_text(size = 10),
             plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
             panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
             legend.background = element_rect(fill = "#f3f3f3",       color = NA),
             legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
             strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
             panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
-            panel.grid.major  = element_line(color="grey90"), 
-            panel.grid.minor  = element_line(color="grey90"), 
+            panel.grid.major  = element_blank(), 
+            panel.grid.minor  = element_blank(),
             title             = element_text(color = "black"),
             plot.subtitle     = element_text(color = "grey40"),
             plot.caption      = element_text(color = "grey70"),
@@ -49,9 +41,37 @@ thd <- theme(plot.title  = element_text(size = 10),
             axis.text         = element_text(color = "black"),
             axis.ticks        = element_line(color = "black"))
 
+thd <- theme(plot.title  = element_text(size = 10),
+             plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
+             panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
+             legend.background = element_rect(fill = "#f3f3f3",       color = NA),
+             legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
+             strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
+             panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
+             panel.grid.major  = element_line(color="grey90"), 
+             panel.grid.minor  = element_line(color="grey90"), 
+             title             = element_text(color = "black"),
+             plot.subtitle     = element_text(color = "grey40"),
+             plot.caption      = element_text(color = "grey70"),
+             strip.text        = element_text(face  = "bold"),
+             axis.text         = element_text(color = "black"),
+             axis.ticks        = element_line(color = "black"))
+
 
 an <- plot_annotation(theme = theme(plot.margin     = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
                                     plot.background = element_rect(fill = "#f3f3f3", color = "#f3f3f3")))
+
+
+
+# Table -------------------------------------------------------------------
+
+total %>% 
+  as.data.frame() %>% 
+  stargazer(digits = 1, decimal.mark = ",", digit.separator = ".")
+
+
+
+# exploration -------------------------------------------------------------
 
 p_date <- data %>% count(date) %>% ggplot(aes(date, n)) + geom_col(color=base, fill=base) + labs(title="Origination", x = NULL, y = NULL) + th
 p_matu <- data %>% count(maturity) %>% ggplot(aes(maturity, n)) + geom_col(color=base, fill=base) + labs(title="Maturity", x = NULL, y = NULL) + th
@@ -137,10 +157,6 @@ m4 <- data %>% group_by(delic_date, state) %>%
   scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
   geom_smooth(aes(color=state), span = 0.25, fill="grey90") + thd + an
 
-
-
-
-
 m5 <- data %>% group_by(delic_date, new_homeowner) %>% 
   summarize(n = sum(delic_binary)) %>% 
   ggplot(aes(delic_date, n)) + 
@@ -148,9 +164,6 @@ m5 <- data %>% group_by(delic_date, new_homeowner) %>%
   geom_smooth(span = 0.25, color=base) + 
   facet_wrap(~new_homeowner, scales="free", nrow=3) +
   thd + an
-
-
-
 
 m6 <- data %>% group_by(delic_date, new_homeowner) %>% 
   summarize(n = sum(delic_mean)) %>% 
@@ -171,7 +184,7 @@ p_sca1 <- data %>% group_by(delic_date, state) %>%
   labs(title="scaled delicenquency binary", x=NULL,y=NULL) +
   geom_point(alpha=0.2) +
   ylim(-2,4) +
-  geom_smooth(span = 0.25, fill="grey90") + thd 
+  geom_smooth(span = 0.25, fill="grey90", se=F) + thd 
 
 p_sca2 <- data %>% group_by(delic_date, state) %>% 
   summarize(n = sum(delic_mean)) %>% 
@@ -185,16 +198,36 @@ p_sca2 <- data %>% group_by(delic_date, state) %>%
   labs(title="scaled delicenquency sum", x=NULL,y=NULL) +
   geom_point(alpha=0.2) +
   ylim(-2,4) +
-  geom_smooth(span = 0.25, fill="grey90") + thd 
+  geom_smooth(span = 0.25, fill="grey90", se=F) + thd 
 
 m7 <- p_sca1 + p_sca2 + an + plot_layout(guides = "collect")
 
 
 
+
+
+
+
+
+
+
+# Experiment --------------------------------------------------------------
+
+p_date <- data %>% count(date,delic_binary) %>% ggplot(aes(date, n)) + geom_col(aes(color=delic_binary, fill=delic_binary)) + labs(title="Origination", x = NULL, y = NULL) + th + scale_color_brewer(palette="Paired")  + scale_fill_brewer(palette="Paired")
+p_matu <- data %>% count(maturity,delic_binary) %>% ggplot(aes(maturity, n)) + geom_col(aes(color=delic_binary, fill=delic_binary)) + labs(title="Maturity", x = NULL, y = NULL) + th + scale_color_brewer(palette="Paired") + scale_fill_brewer(palette="Paired")
+p_stat <- data %>% count(state,delic_binary) %>% ggplot(aes(reorder(state,n), n)) + geom_col(aes(fill=delic_binary)) + labs(title="State", x = NULL, y = NULL) + th + scale_color_brewer(palette="Paired") + scale_fill_brewer(palette="Paired")
+
+p_stat <- data %>% count(state,delic_binary) %>% ggplot(aes(reorder(state,n), n)) + geom_col(aes(fill=delic_binary), position = "fill") + labs(title="State", x = NULL, y = NULL) + th + scale_color_brewer(palette="Paired") + scale_fill_brewer(palette="Paired")
+
+p1 <- ((p_date + p_matu + plot_layout(nrow=1)) / p_stat) + an + plot(lay)
+
+
+p1
+
+
+
+
 # Network analsis ---------------------------------------------------------
-library(scales)
-library(tidygraph)
-library(ggraph)
 
 set.seed(1)
 p_net1 <- data %>% group_by(seller, servicer) %>% 
@@ -255,18 +288,25 @@ n2 <- data %>%
 
 
 
+# map ---------------------------------------------------------------------
+
+
+
+
+states_map <- map_data("state")
+dat <- data %>% group_by(state) %>% summarize(n=n()) %>% 
+  mutate(region = tolower(abbr2state(state)))
+
+ggplot(dat, aes(map_id = region)) +
+  geom_map(aes(fill = n), map = states_map) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(title="US" , x=NULL, y=NULL, fill="Loans")
 
 
 
 
 
-
-
-
-
-
-
-
+# Save --------------------------------------------------------------------
 
 
 ggsave(p1, filename = "plots/p1.pdf", width=12, height=5, dpi=300)
@@ -286,73 +326,8 @@ ggsave(n2, filename = "plots/n2.pdf", width=12, height=5, dpi=300)
 
 
 
-library(openintro)
-
-states_map <- map_data("state")
-dat <- data %>% group_by(state) %>% summarize(n=n()) %>% 
-  mutate(region = tolower(abbr2state(state)))
-
-ggplot(dat, aes(map_id = region)) +
-  geom_map(aes(fill = n), map = states_map) +
-  expand_limits(x = states_map$long, y = states_map$lat) + th +
-  labs(title="US" , x=NULL, y=NULL, fill="Loans")
 
 
-library(zipcode)
-data("zipcode")
-
-dat <- data %>% group_by(postal_code) %>% summarize(n=n()) %>% mutate(zip = substr(postal_code,1,3))
-zipcode$zip <- substr(zipcode$zip, 1, 3)
-zipcode$lat <- zipcode$latitude
-
-ggplot(dat, aes(map_id = zip)) +
-  geom_map(aes(fill = n, x=latitude, y=longitude), map = zipcode)
-
-
-
-
-#predict -----------------------------------------------------------------
-
-data2 <- sample_n(data, 5000)
-
-
-library(caret)
-
-index    <- createDataPartition(data2$delic_binary, p = 0.75, list = FALSE)
-training <- data2[index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
-test     <- data2[-index,] %>% select(-delic_mean, -delic_date, -surv, -surv_binary, -recovered, -first_complete_stop, -loan_type)
-
-
-
-cv <- trainControl(method = "cv", number = 5)
-
-fit_glm <- train(as.factor(delic_binary)     ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 alpha = 0.5,
-                 lambda = 0.1,
-                 method    = "glmnet", 
-                 metric    = "Accuracy",
-                 na.action=na.exclude)
-
-table(predict(fit_glm, newdata=test), test$delic_binary)
-
-
-
-
-
-
-
-
-
-
-fit_lar <- train(price     ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 method    = '',
-                 tuneGrid  = expand.grid(.fraction = seq(0.01, 0.99, length = 50)),
-                 metric    = "RMSE")
-t2 <- Sys.time()
 
 
 
