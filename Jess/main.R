@@ -62,7 +62,7 @@ Total2 %>% count(area) %>% arrange(desc(n))
 Total2 %>% count(median_income2018) %>% arrange(desc(n))
 Total2 %>% count(White) %>% arrange(desc(n))
 
-save(Total2, file = "Total2.rdata")
+#save(Total2, file = "Total2.rdata")
 
 
 # Plots -------------------------------------------------------------------
@@ -129,7 +129,7 @@ Inc_p <- Total2 %>% filter(!is.na(median_income2015), !is.na(delic_binary)) %>% 
 
 etni_p <- (His_p + Bl_p + Inc_p + plot_layout(nrow=1)) + an
 etni_p
-ggsave(etni_p,filename = "etni_p.pdf", width=12, height=5, dpi=300)
+#ggsave(etni_p,filename = "etni_p.pdf", width=12, height=5, dpi=300)
  
 
 
@@ -199,3 +199,4 @@ ggplot(dat5, aes(map_id = region)) +
 
 u <- unique(Total2$area)
 length(u)
+
