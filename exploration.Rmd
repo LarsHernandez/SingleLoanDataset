@@ -1,0 +1,188 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+
+```{r}
+
+library(tidyverse)
+library(patchwork)
+library(openintro) #get state from abbr
+library(scales)
+library(tidygraph)
+library(ggraph)
+library(caret)
+
+
+
+load("Total.rdata")
+
+data <- subset(total, !(state %in% c("VI", "GU", "PR")))
+```
+
+```{r}
+# Theme -------------------------------------------------------------------
+
+base <- "#08306b"
+
+th <- theme(plot.title  = element_text(size = 10),
+            plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
+            panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
+            legend.background = element_rect(fill = "#f3f3f3",       color = NA),
+            legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
+            strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
+            panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
+            panel.grid.major  = element_blank(), 
+            panel.grid.minor  = element_blank(),
+            title             = element_text(color = "black"),
+            plot.subtitle     = element_text(color = "grey40"),
+            plot.caption      = element_text(color = "grey70"),
+            strip.text        = element_text(face  = "bold"),
+            axis.text         = element_text(color = "black"),
+            axis.ticks        = element_line(color = "black"))
+
+thd <- theme(plot.title  = element_text(size = 10),
+             plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
+             panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
+             legend.background = element_rect(fill = "#f3f3f3",       color = NA),
+             legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
+             strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
+             panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
+             panel.grid.major  = element_line(color="grey90"), 
+             panel.grid.minor  = element_line(color="grey90"), 
+             title             = element_text(color = "black"),
+             plot.subtitle     = element_text(color = "grey40"),
+             plot.caption      = element_text(color = "grey70"),
+             strip.text        = element_text(face  = "bold"),
+             axis.text         = element_text(color = "black"),
+             axis.ticks        = element_line(color = "black"))
+
+
+an <- plot_annotation(theme = theme(plot.margin     = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+                                    plot.background = element_rect(fill = "#f3f3f3", color = "#f3f3f3")))
+```
+
+
+
+
+
+```{r}
+total %>% 
+  as.data.frame() %>% 
+  stargazer(digits = 1, decimal.mark = ",", digit.separator = ".")
+```
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+# Experiment --------------------------------------------------------------
+
+basem1 <- "#4f6980"
+basem2 <- "#849db1"
+
+
+p_date <- data %>% count(date,delic_binary) %>% ggplot(aes(date, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
+  labs(title="Origination", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+
+p_matu <- data %>% count(maturity,delic_binary) %>% ggplot(aes(maturity, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
+  labs(title="Maturity", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+
+p_stat <- data %>% count(state,delic_binary) %>% filter(!is.na(delic_binary)) %>% ggplot(aes(reorder(state,n), n/1000)) + geom_col(aes(fill=delic_binary)) + 
+  labs(title="State", x = NULL, y = NULL, fill="Delinquent") + th + 
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+
+a1 <- p_date + p_matu + p_stat + plot_layout(guides="collect", design = "12\n33") + an 
+a1
+
+
+
+
+
+
+
+p_insu <- data %>% count(insurance_pct,delic_binary) %>% filter(n>50) %>% ggplot(aes(reorder(insurance_pct, as.numeric(insurance_pct)),n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Insurance Percentage", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_unit <- data %>% count(units,delic_binary) %>% ggplot(aes(units, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Number of Units", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_ocus <- data %>% count(ocu_status,delic_binary) %>% ggplot(aes(ocu_status, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Ocupancy Status", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_newh <- data %>% filter(new_homeowner != 9) %>% count(new_homeowner,delic_binary) %>% ggplot(aes(new_homeowner, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="New Homeowner", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_chan <- data %>% count(channel,delic_binary) %>% ggplot(aes(channel, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Channel", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_pmmm <- data %>% count(ppm,delic_binary) %>% ggplot(aes(ppm, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="PPM", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_type <- data %>% count(loan_type,delic_binary) %>% ggplot(aes(loan_type, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Loan Type", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_ptyp <- data %>% count(property_type,delic_binary) %>% ggplot(aes(property_type, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Property Type", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_purp <- data %>% count(loan_purpose,delic_binary) %>% ggplot(aes(loan_purpose, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Purpose of Loan", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_term <- data %>% count(term,delic_binary) %>% filter(n>200) %>% ggplot(aes(as.factor(term), n/1000)) + geom_col(aes(fill=delic_binary))+ labs(title="Number of Terms", x = NULL, y = NULL, fill="Delinquent") + th+ scale_fill_manual(values = c(basem1, basem2))
+p_borr <- data %>% filter(n_borrowers != 99) %>% count(n_borrowers,delic_binary) %>% ggplot(aes(n_borrowers, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Number of Borrowers", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+
+a2 <- p_chan + p_type + p_purp  + p_borr + p_ocus + p_newh + p_term + p_insu + p_ptyp + plot_layout(guides="collect", design = "123456\n778899") + an
+a2
+
+
+
+
+p_cred <- data %>% filter(credit_score != 9999,!is.na(delic_binary)) %>% ggplot(aes(credit_score)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Credit Score", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_cltv <- data %>% filter(com_loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(com_loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Complete Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_nltv <- data %>% filter(loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_dtin <- data %>% filter(debt_to_income != 999,!is.na(delic_binary)) %>% ggplot(aes(debt_to_income)) + geom_histogram(bins=60, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Debt to Income", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_upba <- data %>% filter(!is.na(delic_binary)) %>% ggplot(aes(upb)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Unpaid Balance", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_rate <- data %>% filter(!is.na(delic_binary)) %>% ggplot(aes(rate)) + geom_histogram(bins=40, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Interestrate", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+
+a3 <- p_cred + p_cltv + p_nltv + p_dtin + p_upba + p_rate + plot_layout(nrow=2, guides = "collect") + an
+a3
+
+topsell <- data %>% count(seller) %>% top_n(20)
+topserv <- data %>% count(servicer) %>% top_n(20)
+
+p_sell <- data %>% filter(!is.na(delic_binary))%>% count(seller, delic_binary) %>% filter(seller %in% topsell$seller) %>% ggplot(aes(reorder(seller,n), n)) + 
+  geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Seller", x = NULL,fill = "Delinquent") + th + scale_fill_manual(values = c(basem1, basem2))
+
+p_serv <- data %>% filter(!is.na(delic_binary)) %>% count(servicer, delic_binary) %>% filter(servicer %in% topserv$servicer) %>% ggplot(aes(reorder(servicer,n), n)) + 
+  geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Servicer", x = NULL,fill = "Delinquent") + th + scale_fill_manual(values = c(basem1, basem2))
+
+a4 <- p_sell + p_serv + an + plot_layout(guides = "collect")
+a4
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
