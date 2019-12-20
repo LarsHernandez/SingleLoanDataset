@@ -20,9 +20,10 @@ library(VIM)
 library(mice)
 
 load("../Total.rdata")
+#write.csv(total, file = "total.csv")
 
-sub <- total %>% select(c(1:25))
-aggr(sub, cex.axis =0.8)
+#sub <- total %>% select(c(1:25))
+#aggr(sub, cex.axis =0.8)
 
 Inc_MSA <- read_delim("MedianIncome_MSA.csv", 
                       ";", escape_double = FALSE, trim_ws = TRUE, 
@@ -62,7 +63,7 @@ Total2 %>% count(area) %>% arrange(desc(n))
 Total2 %>% count(median_income2018) %>% arrange(desc(n))
 Total2 %>% count(White) %>% arrange(desc(n))
 
-#save(Total2, file = "Total2.rdata")
+save(Total2, file = "Total2.rdata")
 
 
 # Plots -------------------------------------------------------------------
