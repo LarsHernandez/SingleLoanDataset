@@ -63,7 +63,7 @@ Total2 %>% count(area) %>% arrange(desc(n))
 Total2 %>% count(median_income2018) %>% arrange(desc(n))
 Total2 %>% count(White) %>% arrange(desc(n))
 
-save(Total2, file = "Total2.rdata")
+#save(Total2, file = "Total2.rdata")
 
 
 # Plots -------------------------------------------------------------------
