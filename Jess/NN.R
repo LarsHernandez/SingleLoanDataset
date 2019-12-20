@@ -12,6 +12,7 @@ library(keras)
 library(tensorflow)
 library(recipes)
 
+
 load("../Total.rdata")
 data <- subset(total, !(state %in% c("VI", "GU", "PR")))
 

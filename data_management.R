@@ -93,7 +93,7 @@ total <- bind_rows(total, data)
 
 }
 
-total$income<- total$max_unpaid / total$term * 100 / ifelse(total$debt_to_income == 999, NA, total$debt_to_income)
+total$income<- total$upb / total$term * 100 / ifelse(total$debt_to_income == 999, NA, total$debt_to_income)
 
 table(total$delic_binary, total$dataset)
 
