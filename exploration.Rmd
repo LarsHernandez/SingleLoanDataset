@@ -4,9 +4,7 @@ output: html_document
 ---
 
 
-
 ```{r}
-
 library(tidyverse)
 library(patchwork)
 library(openintro) #get state from abbr
@@ -14,8 +12,8 @@ library(scales)
 library(tidygraph)
 library(ggraph)
 library(caret)
-
-
+library(stargazer)
+library(ggthemes)
 
 load("Total.rdata")
 
@@ -24,34 +22,20 @@ data <- subset(total, !(state %in% c("VI", "GU", "PR")))
 
 ```{r}
 # Theme -------------------------------------------------------------------
+base   <- "#08306b"
+basem1 <- "#4f6980"
+basem2 <- "#849db1"
 
-base <- "#08306b"
 
-th <- theme(plot.title  = element_text(size = 10),
-            plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
-            panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
-            legend.background = element_rect(fill = "#f3f3f3",       color = NA),
-            legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
-            strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
-            panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
-            panel.grid.major  = element_blank(), 
-            panel.grid.minor  = element_blank(),
-            title             = element_text(color = "black"),
-            plot.subtitle     = element_text(color = "grey40"),
-            plot.caption      = element_text(color = "grey70"),
-            strip.text        = element_text(face  = "bold"),
-            axis.text         = element_text(color = "black"),
-            axis.ticks        = element_line(color = "black"))
-
-thd <- theme(plot.title  = element_text(size = 10),
-             plot.background   = element_rect(fill = "#f3f3f3",       color = "#f3f3f3"),
-             panel.background  = element_rect(fill = "#f3f3f3",       color = NA), 
-             legend.background = element_rect(fill = "#f3f3f3",       color = NA),
-             legend.key        = element_rect(fill = "#f3f3f3",       color = NA),
-             strip.background  = element_rect(fill = "#f3f3f3",       color = NA),
-             panel.border      = element_rect(fill = NA,       color = "black", size = 0.3),
-             panel.grid.major  = element_line(color="grey90"), 
-             panel.grid.minor  = element_line(color="grey90"), 
+thd <- theme(plot.title        = element_text(size  = 10),
+             plot.background   = element_rect(fill  = "#f3f3f3", color = "#f3f3f3"),
+             panel.background  = element_rect(fill  = "#f3f3f3", color = NA), 
+             legend.background = element_rect(fill  = "#f3f3f3", color = NA),
+             legend.key        = element_rect(fill  = "#f3f3f3", color = NA),
+             strip.background  = element_rect(fill  = "#f3f3f3", color = NA),
+             panel.border      = element_rect(fill  = NA,        color = "black", size = 0.3),
+             panel.grid.major  = element_line(color ="grey90"), 
+             panel.grid.minor  = element_line(color ="grey90"), 
              title             = element_text(color = "black"),
              plot.subtitle     = element_text(color = "grey40"),
              plot.caption      = element_text(color = "grey70"),
@@ -59,6 +43,8 @@ thd <- theme(plot.title  = element_text(size = 10),
              axis.text         = element_text(color = "black"),
              axis.ticks        = element_line(color = "black"))
 
+th <- thd + theme(panel.grid.major  = element_blank(), 
+                  panel.grid.minor  = element_blank())
 
 an <- plot_annotation(theme = theme(plot.margin     = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
                                     plot.background = element_rect(fill = "#f3f3f3", color = "#f3f3f3")))
@@ -68,7 +54,7 @@ an <- plot_annotation(theme = theme(plot.margin     = unit(c(0.5, 0.5, 0.5, 0.5)
 
 
 
-```{r}
+```{r eval=FALSE, include=FALSE}
 total %>% 
   as.data.frame() %>% 
   stargazer(digits = 1, decimal.mark = ",", digit.separator = ".")
@@ -84,34 +70,20 @@ total %>%
 
 
 
-```{r}
-
+```{r message=FALSE, warning=FALSE}
 # Experiment --------------------------------------------------------------
-
-basem1 <- "#4f6980"
-basem2 <- "#849db1"
-
-
 p_date <- data %>% count(date,delic_binary) %>% ggplot(aes(date, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
   labs(title="Origination", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
   scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
-
 p_matu <- data %>% count(maturity,delic_binary) %>% ggplot(aes(maturity, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
   labs(title="Maturity", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
   scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
-
 p_stat <- data %>% count(state,delic_binary) %>% filter(!is.na(delic_binary)) %>% ggplot(aes(reorder(state,n), n/1000)) + geom_col(aes(fill=delic_binary)) + 
   labs(title="State", x = NULL, y = NULL, fill="Delinquent") + th + 
   scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
 
 a1 <- p_date + p_matu + p_stat + plot_layout(guides="collect", design = "12\n33") + an 
 a1
-
-
-
-
-
-
 
 p_insu <- data %>% count(insurance_pct,delic_binary) %>% filter(n>50) %>% ggplot(aes(reorder(insurance_pct, as.numeric(insurance_pct)),n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Insurance Percentage", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
 p_unit <- data %>% count(units,delic_binary) %>% ggplot(aes(units, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Number of Units", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
@@ -128,9 +100,6 @@ p_borr <- data %>% filter(n_borrowers != 99) %>% count(n_borrowers,delic_binary)
 a2 <- p_chan + p_type + p_purp  + p_borr + p_ocus + p_newh + p_term + p_insu + p_ptyp + plot_layout(guides="collect", design = "123456\n778899") + an
 a2
 
-
-
-
 p_cred <- data %>% filter(credit_score != 9999,!is.na(delic_binary)) %>% ggplot(aes(credit_score)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Credit Score", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
 p_cltv <- data %>% filter(com_loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(com_loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Complete Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
 p_nltv <- data %>% filter(loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary)) + labs(fill = "Delinquent", title="Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
@@ -143,25 +112,109 @@ a3
 
 topsell <- data %>% count(seller) %>% top_n(20)
 topserv <- data %>% count(servicer) %>% top_n(20)
-
 p_sell <- data %>% filter(!is.na(delic_binary))%>% count(seller, delic_binary) %>% filter(seller %in% topsell$seller) %>% ggplot(aes(reorder(seller,n), n)) + 
   geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Seller", x = NULL,fill = "Delinquent") + th + scale_fill_manual(values = c(basem1, basem2))
-
 p_serv <- data %>% filter(!is.na(delic_binary)) %>% count(servicer, delic_binary) %>% filter(servicer %in% topserv$servicer) %>% ggplot(aes(reorder(servicer,n), n)) + 
   geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Servicer", x = NULL,fill = "Delinquent") + th + scale_fill_manual(values = c(basem1, basem2))
 
 a4 <- p_sell + p_serv + an + plot_layout(guides = "collect")
 a4
-
-
-
-
 ```
 
 
 
 
 
+```{r}
+m1 <- data %>% group_by(seller) %>% filter(n() > 5000) %>% mutate(nn = n()) %>% 
+  group_by(delic_binary, add=TRUE) %>% 
+  summarize(per = mean(100*n()/nn)) %>% 
+  select(seller, per, delic_binary) %>% 
+  filter(delic_binary == TRUE) %>% 
+  ggplot(aes(reorder(seller, per), per)) + geom_col(fill=basem1) +
+  coord_flip() +
+  labs(title=NULL, x=NULL, y=NULL) + th + an
+
+m2 <- data %>% filter(credit_score != 9999, credit_score != 300, !is.na(delic_binary)) %>% sample_n(60000) %>% 
+  ggplot(aes(credit_score, rate, color=delic_binary)) + geom_jitter(width = 0.2, height = 0.2, size=2) + geom_smooth(method = "lm", color="black") +
+  scale_color_manual(values = c(basem1, basem2)) +
+  labs(title=NULL, x=NULL, y=NULL) + th + an
+
+m3 <- data %>% group_by(delic_date, state) %>% summarize(n = sum(delic_binary)) %>% 
+  ggplot(aes(delic_date, n)) + 
+  geom_smooth(span = 0.25, color=base) +
+  scale_x_date(date_breaks = "4 year", labels = date_format("%Y")) +
+  facet_wrap(~state, scales="free", nrow=9) + th + an
+
+m4 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ggplot(aes(delic_date, n)) + 
+  scale_color_brewer(palette="Paired") +
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(aes(color=state), span = 0.25, fill="grey90") + thd + an
+
+m5 <- data %>% group_by(delic_date, new_homeowner) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  ggplot(aes(delic_date, n)) + 
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(span = 0.25, color=base) + 
+  facet_wrap(~new_homeowner, scales="free", nrow=3) +
+  thd + an
+
+m6 <- data %>% group_by(delic_date, new_homeowner) %>% 
+  summarize(n = sum(delic_mean)) %>% 
+  ggplot(aes(delic_date, n)) + 
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(span = 0.25, color=base) + 
+  thd + an
+
+p_sca1 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "4 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency binary", x=NULL,y=NULL) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey80", se=F) + thd 
+
+p_sca2 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_mean)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "4 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency sum", x=NULL,y=NULL) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey90", se=F) + thd 
+
+p_sca3 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA", "IL")) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "6 year", labels = date_format("%Y"), date_minor_breaks = "2 year") +
+  geom_point(alpha=0.3, show.legend = F) +
+  geom_smooth(aes(color=state),show.legend = F, span = 0.25) + thd + 
+  theme(strip.background = element_blank(), strip.text = element_blank()) +
+  facet_wrap(~state, nrow=1) + 
+  scale_y_continuous(limits=c(0,150)) +
+  labs(x=NULL, y=NULL, title = "Delinquency binary by state")
+
+m7 <- (p_sca3 | (p_sca1 / p_sca2 + plot_layout(guides = "collect"))) + an + plot_layout(widths = c(2, 1))
+
+
+
+m1;m2;m3;m4;m5;m6;m7
+
+```
 
 
 
