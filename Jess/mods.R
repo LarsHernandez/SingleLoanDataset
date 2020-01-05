@@ -31,7 +31,7 @@ data_model <- subset(data, !is.na(data$delic_binary)) %>%
   filter(!is.na(new_homeowner)) %>% 
   filter(!is.na(state)) %>% 
   filter(!is.na(n_borrowers)) %>% 
-  sample_n(100000) 
+  sample_n(300000) 
 
 index    <- createDataPartition(data_model$delic_binary, p = 0.75, list = FALSE)
 training <- data_model[index,]
@@ -53,32 +53,32 @@ test           <- bake(prepped_recipe, test)
 #predict -----------------------------------------------------------------
 
 t0 <- Sys.time()
-fit_tre <- train(delic_binary ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 method    = "rpart", 
-                 metric    = "ROC")
+#fit_tre <- train(delic_binary ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "rpart", 
+#                 metric    = "ROC")
 t1 <- Sys.time()
-fit_glm <- train(delic_binary ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 method    = "glm",
-                 family    = "binomial",
-                 metric    = "ROC")
+#fit_glm <- train(delic_binary ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "glm",
+#                 family    = "binomial",
+#                 metric    = "ROC")
 t2 <- Sys.time()
-fit_bag <- train(delic_binary ~ .,
-                 data      = training,
-                 trControl = cv,
-                 nbagg     = 5,
-                 method    = "treebag",
-                 metric    = "ROC")
+#fit_bag <- train(delic_binary ~ .,
+#                 data      = training,
+#                 trControl = cv,
+#                 nbagg     = 5,
+#                 method    = "treebag",
+#                 metric    = "ROC")
 t3 <- Sys.time()
-fit_raf <- train(delic_binary ~ .,
-                 data      = training,
-                 trControl = cv,
-                 ntree     = 30, 
-                 method    = "rf",
-                 metric    = "ROC")
+#fit_raf <- train(delic_binary ~ .,
+#                 data      = training,
+#                 trControl = cv,
+#                 ntree     = 30, 
+#                 method    = "rf",
+#                 metric    = "ROC")
 t4 <- Sys.time()
 #fit_lda <- train(delic_binary ~ .,
 #                 data      = training,
@@ -150,16 +150,16 @@ xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extre
 
 #ela$model <- "Elastic Net Regression"
 
-df <- rbind(glm, tre, raf, net, xgb, bag)
+df <- rbind(net, xgb)
 
 #save(df,file="ml.df.ROC")
 
 conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
-                table(predict(fit_tre,  newdata=test), test$delic_binary),
-                table(predict(fit_net,  newdata=test), test$delic_binary),
-                table(predict(fit_raf,  newdata=test), test$delic_binary),
-                table(predict(fit_xgb,  newdata=test), test$delic_binary),
-              table(predict(fit_bag,  newdata=test), test$delic_binary))
+                #table(predict(fit_tre,  newdata=test), test$delic_binary),
+                #table(predict(fit_net,  newdata=test), test$delic_binary),
+                #table(predict(fit_raf,  newdata=test), test$delic_binary),
+                table(predict(fit_xgb,  newdata=test), test$delic_binary))
+              #table(predict(fit_bag,  newdata=test), test$delic_binary))
 
 #save(conf,file="ml.conf.ROC")
 
