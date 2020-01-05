@@ -18,8 +18,9 @@ data <- subset(Total2, !(state %in% c("VI", "GU", "PR","DC")))
 
 data_model <- subset(data, !is.na(data$delic_binary)) %>% 
   select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, White, median_income2018, date) %>% 
-  mutate(delic_binary = as.factor(delic_binary)) %>% 
   mutate(date = as.Date(date)) %>% 
+  mutate(delic_binary = ifelse(delic_binary==TRUE,"yes","no")) %>% 
+  mutate(delic_binary = as.factor(delic_binary)) %>%
   filter(!is.na(median_income2018)) %>% 
   filter(!is.na(White)) %>% 
   filter(!is.na(channel)) %>% 
@@ -38,7 +39,7 @@ test     <- data_model[-index,]
 
 # Recipe ------------------------------------------------------------------
 
-cv <- trainControl(method = "cv", number = 5)
+cv <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
 
 model_recipe_steps <- recipe(delic_binary ~ ., data = training) %>%
   step_string2factor(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
@@ -56,28 +57,28 @@ fit_tre <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "rpart", 
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t1 <- Sys.time()
 fit_glm <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "glm",
                  family    = "binomial",
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t2 <- Sys.time()
 fit_bag <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv,
                  nbagg     = 5,
                  method    = "treebag",
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t3 <- Sys.time()
 fit_raf <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv,
                  ntree     = 30, 
                  method    = "rf",
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t4 <- Sys.time()
 #fit_lda <- train(delic_binary ~ .,
 #                 data      = training,
@@ -89,7 +90,7 @@ fit_net <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "glmnet",
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t6 <- Sys.time()
 #fit_knn <- train(delic_binary     ~ .,
 #                 data      = training,
@@ -101,7 +102,7 @@ fit_xgb <- train(delic_binary     ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "xgbTree",
-                 metric    = "Kappa")
+                 metric    = "ROC")
 t8 <- Sys.time()
 #fit_svm <- train(delic_binary     ~ .,
               #   data      = training,
@@ -149,17 +150,18 @@ xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extre
 
 #ela$model <- "Elastic Net Regression"
 
-df <- rbind(ran, glm, tre, nav, raf, net, xgb)
+df <- rbind(glm, tre, raf, net, xgb, bag)
 
-#save(df,file="ml.df.add")
+#save(df,file="ml.df.ROC")
 
 conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
                 table(predict(fit_tre,  newdata=test), test$delic_binary),
                 table(predict(fit_net,  newdata=test), test$delic_binary),
                 table(predict(fit_raf,  newdata=test), test$delic_binary),
-                table(predict(fit_xgb,  newdata=test), test$delic_binary))
+                table(predict(fit_xgb,  newdata=test), test$delic_binary),
+              table(predict(fit_bag,  newdata=test), test$delic_binary))
 
-#save(conf,file="ml.conf.add")
+#save(conf,file="ml.conf.ROC")
 
 ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
   geom_col(position="dodge", width = 0.6) + 
@@ -172,16 +174,3 @@ ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) +
 df %>% filter(.metric == "accuracy") %>% arrange(desc(.estimate))
 
 
-ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
-  geom_col(position="dodge", width = 0.6) + 
-  scale_fill_tableau(palette = "Miller Stone", type = "regular") + 
-  labs(title=paste("Model performance on predicting delinquency from a sample of",nrow(training)), 
-       subtitle="Crossvalidated 1/5 split - Normal sampeling", 
-       fill="Predictive Models\nordered by performance")
-
-ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
-  geom_col(position="dodge", width = 0.6) + 
-  scale_fill_tableau(palette = "Superfishel Stone", type = "regular") + 
-  labs(title=paste("Model performance on predicting delinquency from a sample of",nrow(training)), 
-       subtitle="Crossvalidated 1/5 split - Normal sampeling", 
-       fill="Predictive Models\nordered by performance")
