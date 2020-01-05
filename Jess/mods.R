@@ -11,36 +11,27 @@ library(mice)
 library(recipes)
 
 
-load("../Total.rdata")
-data <- subset(total, !(state %in% c("VI", "GU", "PR")))
-
-
-#fit <- glm(delic_binary ~ delic_binary+credit_score+new_homeowner+state+channel+loan_purpose+debt_to_income, data = total, family = "binomial")
-#apply(data, MARGIN=2, FUN=function(x) sum(is.na(x)))
-
+load("../Total2.rdata")
+data <- subset(Total2, !(state %in% c("VI", "GU", "PR","DC")))
 
 # Data --------------------------------------------------------------------
 
 data_model <- subset(data, !is.na(data$delic_binary)) %>% 
-  select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, postal_code) %>% 
+  select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, White, median_income2018, date) %>% 
   mutate(delic_binary = as.factor(delic_binary)) %>% 
-  sample_n(100000) %>% 
-  filter(!is.na(postal_code)) %>% 
+  mutate(date = as.Date(date)) %>% 
+  filter(!is.na(median_income2018)) %>% 
+  filter(!is.na(White)) %>% 
   filter(!is.na(channel)) %>% 
   filter(!is.na(loan_purpose)) %>% 
   filter(!is.na(property_type)) %>% 
   filter(!is.na(seller)) %>% 
   filter(!is.na(ocu_status)) %>% 
-  filter(!is.na(new_homeowner))
+  filter(!is.na(new_homeowner)) %>% 
+  filter(!is.na(state)) %>% 
+  filter(!is.na(n_borrowers)) %>% 
+  sample_n(100000) 
 
-
-
-# Mice imputation ---------------------------------------------------------
-
-#temp <- mice(data_model, m = 1, maxit=50, meth='pmm', seed = 500)
-#imp_data_model <- complete(temp, 1)
-#sum(is.na(imp_data_model))
-#
 index    <- createDataPartition(data_model$delic_binary, p = 0.75, list = FALSE)
 training <- data_model[index,]
 test     <- data_model[-index,]
@@ -49,27 +40,16 @@ test     <- data_model[-index,]
 
 cv <- trainControl(method = "cv", number = 5)
 
-model_recipe_steps <- recipe(delic_binary ~ ., data = training) %>% 
-  step_string2factor(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers, postal_code) %>% 
-  step_dummy(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers, postal_code) %>% 
-  step_range(credit_score, debt_to_income, upb, rate, units, loan_to_value, min = 0, max = 1)
+model_recipe_steps <- recipe(delic_binary ~ ., data = training) %>%
+  step_string2factor(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
+  step_dummy(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
+  step_range(credit_score, debt_to_income, upb, rate, units, loan_to_value, median_income2018, White, min = 0, max = 1)
 
 prepped_recipe <- prep(model_recipe_steps, training = training)
 training       <- bake(prepped_recipe, training) 
 test           <- bake(prepped_recipe, test) 
 
-
-#x_train  <- training %>% select(-price)
-#x_test   <- test     %>% select(-price)
-#y_train  <- training %>% select(price)
-#y_test   <- test     %>% select(price)
-
-
-
 #predict -----------------------------------------------------------------
-
-
-
 
 t0 <- Sys.time()
 fit_tre <- train(delic_binary ~ .,
@@ -88,23 +68,22 @@ t2 <- Sys.time()
 fit_bag <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv,
-                 nbagg     = 20,
+                 nbagg     = 5,
                  method    = "treebag",
                  metric    = "Kappa")
 t3 <- Sys.time()
 fit_raf <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv,
-                 .mtry     = 6,
                  ntree     = 30, 
                  method    = "rf",
                  metric    = "Kappa")
 t4 <- Sys.time()
-fit_lda <- train(delic_binary ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 method    = "lda",
-                 metric    = "Kappa")
+#fit_lda <- train(delic_binary ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "lda",
+#                 metric    = "Kappa")
 t5 <- Sys.time()
 fit_net <- train(delic_binary ~ .,
                  data      = training,
@@ -112,11 +91,11 @@ fit_net <- train(delic_binary ~ .,
                  method    = "glmnet",
                  metric    = "Kappa")
 t6 <- Sys.time()
-fit_knn <- train(delic_binary     ~ .,
-                 data      = training,
-                 trControl = cv, 
-                 method    = "kknn",
-                 metric    = "Kappa")
+#fit_knn <- train(delic_binary     ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "kknn",
+#                 metric    = "Kappa")
 t7 <- Sys.time()
 fit_xgb <- train(delic_binary     ~ .,
                  data      = training,
@@ -137,9 +116,9 @@ cat(paste0("Size of training set: ", nrow(training)," of 21613\n","\n",
            "Tree:                 ", round(difftime(t2,t1, units = "mins"),2),"\n",
            "Bagged:               ", round(difftime(t3,t2, units = "mins"),2),"\n",
            "Random Forrest:       ", round(difftime(t4,t3, units = "mins"),2),"\n",
-           "LDA:                  ", round(difftime(t5,t4, units = "mins"),2),"\n",
+           #"LDA:                  ", round(difftime(t5,t4, units = "mins"),2),"\n",
            "Elastic Net:          ", round(difftime(t6,t5, units = "mins"),2),"\n",
-           "KNNt:                 ", round(difftime(t7,t6, units = "mins"),2),"\n",
+           #"KNNt:                 ", round(difftime(t7,t6, units = "mins"),2),"\n",
            "XGB:                  ", round(difftime(t8,t7, units = "mins"),2),"\n",
            "Total:                ", round(difftime(t9,t0, units = "mins"),2),"\n"))
 
@@ -162,15 +141,25 @@ glm <- sspec(table(predict(fit_glm,  newdata=test), test$delic_binary),   "Logis
 tre <- sspec(table(predict(fit_tre,  newdata=test), test$delic_binary),   "Classification Tree")
 bag <- sspec(table(predict(fit_bag,  newdata=test), test$delic_binary),   "Bagged Tree")
 raf <- sspec(table(predict(fit_raf,  newdata=test), test$delic_binary),   "Random Forrest")
-lda <- sspec(table(predict(fit_lda,  newdata=test), test$delic_binary),   "Linear Diskriminant Analysis")
+#lda <- sspec(table(predict(fit_lda,  newdata=test), test$delic_binary),   "Linear Diskriminant Analysis")
 net <- sspec(table(predict(fit_net,  newdata=test), test$delic_binary),   "Elastic Net")
 xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extreme Gradient Boosting")
-knn <- sspec(table(predict(fit_knn,  newdata=test), test$delic_binary),   "K nearest neightbour")
+#knn <- sspec(table(predict(fit_knn,  newdata=test), test$delic_binary),   "K nearest neightbour")
 #svm <- sspec(table(predict(fit_svm,  newdata=test), test$delic_binary),   "Support Vector Classifier")
 
 #ela$model <- "Elastic Net Regression"
 
-df <- rbind(ran, glm, tre, nav, bag, raf, lda, net, xgb, svm)
+df <- rbind(ran, glm, tre, nav, raf, net, xgb)
+
+#save(df,file="ml.df.add")
+
+conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
+                table(predict(fit_tre,  newdata=test), test$delic_binary),
+                table(predict(fit_net,  newdata=test), test$delic_binary),
+                table(predict(fit_raf,  newdata=test), test$delic_binary),
+                table(predict(fit_xgb,  newdata=test), test$delic_binary))
+
+#save(conf,file="ml.conf.add")
 
 ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
   geom_col(position="dodge", width = 0.6) + 
