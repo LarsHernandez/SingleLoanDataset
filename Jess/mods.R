@@ -30,7 +30,8 @@ data_model <- subset(data, !is.na(data$delic_binary)) %>%
   filter(!is.na(ocu_status)) %>% 
   filter(!is.na(new_homeowner)) %>% 
   filter(!is.na(state)) %>% 
-  filter(!is.na(n_borrowers)) 
+  filter(!is.na(n_borrowers)) %>% 
+  sample_n(100000)
 
 index    <- createDataPartition(data_model$delic_binary, p = 0.75, list = FALSE)
 training <- data_model[index,]
@@ -135,12 +136,12 @@ rd   <- rbinom(n = length(test$delic_binary), size = 1, prob = mean(as.logical(t
 vec <- as.factor(rep(FALSE,length(test$delic_binary)))
 levels(vec) <- c(FALSE, TRUE)
 
-#nav <- sspec(table(vec, test$delic_binary),                               "Naive Model")
-#ran <- sspec(table(as.factor(if_else(rd == 1, T, F)), test$delic_binary), "Assignment by prop")
-#glm <- sspec(table(predict(fit_glm,  newdata=test), test$delic_binary),   "Logistic Regression")
-#tre <- sspec(table(predict(fit_tre,  newdata=test), test$delic_binary),   "Classification Tree")
-#bag <- sspec(table(predict(fit_bag,  newdata=test), test$delic_binary),   "Bagged Tree")
-#raf <- sspec(table(predict(fit_raf,  newdata=test), test$delic_binary),   "Random Forrest")
+nav <- sspec(table(vec, test$delic_binary),                               "Naive Model")
+ran <- sspec(table(as.factor(if_else(rd == 1, T, F)), test$delic_binary), "Assignment by prop")
+glm <- sspec(table(predict(fit_glm,  newdata=test), test$delic_binary),   "Logistic Regression")
+tre <- sspec(table(predict(fit_tre,  newdata=test), test$delic_binary),   "Classification Tree")
+bag <- sspec(table(predict(fit_bag,  newdata=test), test$delic_binary),   "Bagged Tree")
+raf <- sspec(table(predict(fit_raf,  newdata=test), test$delic_binary),   "Random Forrest")
 #lda <- sspec(table(predict(fit_lda,  newdata=test), test$delic_binary),   "Linear Diskriminant Analysis")
 net <- sspec(table(predict(fit_net,  newdata=test), test$delic_binary),   "Elastic Net")
 xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extreme Gradient Boosting")
@@ -151,7 +152,7 @@ xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extre
 #dfm <- rbind(net, xgb)
 df <- rbind(net, xgb, nav, ran, glm, tre, bag, raf)
 
-save(df,file="ml.final")
+#save(df,file="ml.final")
 #save(dfm,file="df_two")
 
 conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
@@ -161,7 +162,7 @@ conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
                 table(predict(fit_xgb,  newdata=test), test$delic_binary),
               table(predict(fit_bag,  newdata=test), test$delic_binary))
 
-save(conf,file="conf_final")
+#save(conf,file="conf_final")
 #save(confm,file="conf_two")
 
 ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
@@ -174,4 +175,4 @@ ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) +
 
 df %>% filter(.metric == "accuracy") %>% arrange(desc(.estimate))
 
-load("conf_final")
+
