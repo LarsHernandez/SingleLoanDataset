@@ -17,9 +17,9 @@ data <- subset(Total2, !(state %in% c("VI", "GU", "PR","DC")))
 # Data --------------------------------------------------------------------
 
 data_model <- subset(data, !is.na(data$delic_binary)) %>% 
-  select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, White, median_income2018, date) %>% 
-  mutate(date = as.Date(date)) %>% 
-  mutate(delic_binary = ifelse(delic_binary==TRUE,"yes","no")) %>% 
+  select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, White, median_income2018) %>% 
+#  mutate(date = as.Date(date)) %>% 
+#mutate(delic_binary = ifelse(delic_binary==TRUE,"yes","no")) %>% 
   mutate(delic_binary = as.factor(delic_binary)) %>%
   filter(!is.na(median_income2018)) %>% 
   filter(!is.na(White)) %>% 
@@ -30,8 +30,7 @@ data_model <- subset(data, !is.na(data$delic_binary)) %>%
   filter(!is.na(ocu_status)) %>% 
   filter(!is.na(new_homeowner)) %>% 
   filter(!is.na(state)) %>% 
-  filter(!is.na(n_borrowers)) %>% 
-  sample_n(300000) 
+  filter(!is.na(n_borrowers)) 
 
 index    <- createDataPartition(data_model$delic_binary, p = 0.75, list = FALSE)
 training <- data_model[index,]
@@ -39,7 +38,7 @@ test     <- data_model[-index,]
 
 # Recipe ------------------------------------------------------------------
 
-cv <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary)
+cv <- trainControl(method = "cv", number = 5) # , classProbs = TRUE, summaryFunction = twoClassSummary
 
 model_recipe_steps <- recipe(delic_binary ~ ., data = training) %>%
   step_string2factor(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
@@ -53,32 +52,32 @@ test           <- bake(prepped_recipe, test)
 #predict -----------------------------------------------------------------
 
 t0 <- Sys.time()
-#fit_tre <- train(delic_binary ~ .,
-#                 data      = training,
-#                 trControl = cv, 
-#                 method    = "rpart", 
-#                 metric    = "ROC")
+fit_tre <- train(delic_binary ~ .,
+                 data      = training,
+                 trControl = cv, 
+                 method    = "rpart", 
+                 metric    = "Kappa")
 t1 <- Sys.time()
-#fit_glm <- train(delic_binary ~ .,
-#                 data      = training,
-#                 trControl = cv, 
-#                 method    = "glm",
-#                 family    = "binomial",
-#                 metric    = "ROC")
+fit_glm <- train(delic_binary ~ .,
+               data      = training,
+               trControl = cv, 
+               method    = "glm",
+               family    = "binomial",
+                 metric    = "Kappa")
 t2 <- Sys.time()
-#fit_bag <- train(delic_binary ~ .,
-#                 data      = training,
-#                 trControl = cv,
-#                 nbagg     = 5,
-#                 method    = "treebag",
-#                 metric    = "ROC")
+fit_bag <- train(delic_binary ~ .,
+                 data      = training,
+                 trControl = cv,
+                 nbagg     = 5,
+                 method    = "treebag",
+                 metric    = "Kappa")
 t3 <- Sys.time()
-#fit_raf <- train(delic_binary ~ .,
-#                 data      = training,
-#                 trControl = cv,
-#                 ntree     = 30, 
-#                 method    = "rf",
-#                 metric    = "ROC")
+fit_raf <- train(delic_binary ~ .,
+                 data      = training,
+                 trControl = cv,
+                 ntree     = 30, 
+                 method    = "rf",
+                 metric    = "Kappa")
 t4 <- Sys.time()
 #fit_lda <- train(delic_binary ~ .,
 #                 data      = training,
@@ -90,7 +89,7 @@ fit_net <- train(delic_binary ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "glmnet",
-                 metric    = "ROC")
+                 metric    = "Kappa")
 t6 <- Sys.time()
 #fit_knn <- train(delic_binary     ~ .,
 #                 data      = training,
@@ -102,7 +101,7 @@ fit_xgb <- train(delic_binary     ~ .,
                  data      = training,
                  trControl = cv, 
                  method    = "xgbTree",
-                 metric    = "ROC")
+                 metric    = "Kappa")
 t8 <- Sys.time()
 #fit_svm <- train(delic_binary     ~ .,
               #   data      = training,
@@ -136,12 +135,12 @@ rd   <- rbinom(n = length(test$delic_binary), size = 1, prob = mean(as.logical(t
 vec <- as.factor(rep(FALSE,length(test$delic_binary)))
 levels(vec) <- c(FALSE, TRUE)
 
-nav <- sspec(table(vec, test$delic_binary),                               "Naive Model")
-ran <- sspec(table(as.factor(if_else(rd == 1, T, F)), test$delic_binary), "Assignment by prop")
-glm <- sspec(table(predict(fit_glm,  newdata=test), test$delic_binary),   "Logistic Regression")
-tre <- sspec(table(predict(fit_tre,  newdata=test), test$delic_binary),   "Classification Tree")
-bag <- sspec(table(predict(fit_bag,  newdata=test), test$delic_binary),   "Bagged Tree")
-raf <- sspec(table(predict(fit_raf,  newdata=test), test$delic_binary),   "Random Forrest")
+#nav <- sspec(table(vec, test$delic_binary),                               "Naive Model")
+#ran <- sspec(table(as.factor(if_else(rd == 1, T, F)), test$delic_binary), "Assignment by prop")
+#glm <- sspec(table(predict(fit_glm,  newdata=test), test$delic_binary),   "Logistic Regression")
+#tre <- sspec(table(predict(fit_tre,  newdata=test), test$delic_binary),   "Classification Tree")
+#bag <- sspec(table(predict(fit_bag,  newdata=test), test$delic_binary),   "Bagged Tree")
+#raf <- sspec(table(predict(fit_raf,  newdata=test), test$delic_binary),   "Random Forrest")
 #lda <- sspec(table(predict(fit_lda,  newdata=test), test$delic_binary),   "Linear Diskriminant Analysis")
 net <- sspec(table(predict(fit_net,  newdata=test), test$delic_binary),   "Elastic Net")
 xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extreme Gradient Boosting")
@@ -149,19 +148,21 @@ xgb <- sspec(table(predict(fit_xgb,  newdata=test), test$delic_binary),   "Extre
 #svm <- sspec(table(predict(fit_svm,  newdata=test), test$delic_binary),   "Support Vector Classifier")
 
 #ela$model <- "Elastic Net Regression"
+#dfm <- rbind(net, xgb)
+df <- rbind(net, xgb, nav, ran, glm, tre, bag, raf)
 
-df <- rbind(net, xgb)
-
-#save(df,file="ml.df.ROC")
+save(df,file="ml.final")
+#save(dfm,file="df_two")
 
 conf <- rbind(table(predict(fit_glm,  newdata=test), test$delic_binary),
-                #table(predict(fit_tre,  newdata=test), test$delic_binary),
-                #table(predict(fit_net,  newdata=test), test$delic_binary),
-                #table(predict(fit_raf,  newdata=test), test$delic_binary),
-                table(predict(fit_xgb,  newdata=test), test$delic_binary))
-              #table(predict(fit_bag,  newdata=test), test$delic_binary))
+                table(predict(fit_tre,  newdata=test), test$delic_binary),
+                table(predict(fit_net,  newdata=test), test$delic_binary),
+                table(predict(fit_raf,  newdata=test), test$delic_binary),
+                table(predict(fit_xgb,  newdata=test), test$delic_binary),
+              table(predict(fit_bag,  newdata=test), test$delic_binary))
 
-#save(conf,file="ml.conf.ROC")
+save(conf,file="conf_final")
+#save(confm,file="conf_two")
 
 ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
   geom_col(position="dodge", width = 0.6) + 
@@ -173,4 +174,4 @@ ggplot(df, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) +
 
 df %>% filter(.metric == "accuracy") %>% arrange(desc(.estimate))
 
-
+load("conf_final")
