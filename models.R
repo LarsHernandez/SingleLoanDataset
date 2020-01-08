@@ -26,7 +26,7 @@ apply(data, MARGIN=2, FUN=function(x) sum(is.na(x)))
 data_model <- subset(data, !is.na(data$delic_binary)) %>% 
   select(delic_binary, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers) %>% 
   mutate(delic_binary = as.factor(delic_binary)) %>% 
-  sample_n(50000)
+  sample_n(30000)
 
 
 
