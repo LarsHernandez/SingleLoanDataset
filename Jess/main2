@@ -1,0 +1,160 @@
+library(tidyverse)
+library(patchwork)
+library(openintro) #get state from abbr
+library(scales)
+library(tidygraph)
+library(ggraph)
+library(caret)
+library(yardstick)
+library(ggthemes)
+library(mice)
+library(recipes)
+
+load("total_full.rdata")
+#write.csv(total, file = "total.csv")
+
+#sub <- total %>% select(c(1:25))
+#aggr(sub, cex.axis =0.8)
+
+Inc_MSA <- read_delim("MedianIncome_MSA.csv", 
+                      ";", escape_double = FALSE, trim_ws = TRUE, 
+                      skip = 1) %>% select(c(1,3,4))%>% rename( area = `MSA/MD FIPS CODE NO.` ,
+                                                                median_income2018 = `2018 FFIEC EST. MSA/MD MEDIAN FAMILY INCOME**`,
+                                                                median_income2015 = `2015 MSA/MD MED* FAMILY INCOME`) 
+
+
+ARP_MSA <- read_delim("ARP_MSA.csv", 
+                      ";", escape_double = FALSE, locale = locale(decimal_mark = ",", 
+                                                                  grouping_mark = "."), trim_ws = TRUE) %>% 
+  select(-c(20:22))
+
+ARP_MSA$area %<>% as.numeric("area")
+
+state_pop <- read_delim("state_pop.csv", 
+                        ";", escape_double = FALSE, locale = locale(decimal_mark = ",", 
+                                                                    grouping_mark = "."), trim_ws = TRUE, 
+                        skip = 3) %>% 
+  na.omit(state) %>% 
+  select(c(1,10)) %>% 
+  rename(Spop2018 = "2018") %>% 
+  mutate(Spop2018 = as.numeric(Spop2018))
+
+extra <- tibble(state = c("PR","GU","VI"), Spop2018 = c(3195153,162742,106405))  
+
+state_pop <- rbind(state_pop, extra)
+
+Total3 <- total %>% 
+  left_join(Inc_MSA, by = "area")   %>% 
+  left_join(ARP_MSA, by = "area") %>% 
+  left_join(state_pop, by ="state") 
+
+Total3 %>% select() %>% arrange(Spop2018)
+
+Total3 %>% count(area) %>% arrange(desc(n))
+Total3 %>% count(median_income2018) %>% arrange(desc(n))
+Total3 %>% count(White) %>% arrange(desc(n))
+
+save(Total3, file = "Total3.rdata")
+load("Total3.rdata")
+data <- subset(Total3, !(state %in% c("VI", "GU", "PR","DC")))
+
+# Data --------------------------------------------------------------------
+
+data_model <- subset(data, !is.na(data$delic_binary3)) %>% 
+  select(delic_binary3, credit_score, new_homeowner, state, channel, loan_purpose, debt_to_income, property_type, upb, seller, rate, units, ocu_status, loan_to_value, n_borrowers, White, median_income2018) %>% 
+  #mutate(delic_binary3 = ifelse(delic_binary3==TRUE,"yes","no")) %>% 
+  mutate(delic_binary3 = as.factor(delic_binary3)) %>%
+  filter(!is.na(median_income2018)) %>% 
+  filter(!is.na(White)) %>% 
+  filter(!is.na(channel)) %>% 
+  filter(!is.na(loan_purpose)) %>% 
+  filter(!is.na(property_type)) %>% 
+  filter(!is.na(seller)) %>% 
+  filter(!is.na(ocu_status)) %>% 
+  filter(!is.na(new_homeowner)) %>% 
+  filter(!is.na(state)) %>% 
+  filter(!is.na(n_borrowers)) %>% 
+  sample_n(500000) 
+
+index    <- createDataPartition(data_model$delic_binary3, p = 0.75, list = FALSE)
+training <- data_model[index,]
+test     <- data_model[-index,]
+
+# Recipe ------------------------------------------------------------------
+
+cv <- trainControl(method = "cv", number = 5) # , classProbs = TRUE , summaryFunction = twoClassSummary
+
+model_recipe_steps <- recipe(delic_binary3 ~ ., data = training) %>%
+  step_string2factor(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
+  step_dummy(new_homeowner, state, channel, loan_purpose, property_type, seller, ocu_status, n_borrowers) %>% 
+  step_range(credit_score, debt_to_income, upb, rate, units, loan_to_value, median_income2018, White, min = 0, max = 1)
+
+prepped_recipe <- prep(model_recipe_steps, training = training)
+training       <- bake(prepped_recipe, training) 
+test           <- bake(prepped_recipe, test) 
+
+#predict -----------------------------------------------------------------
+
+t0 <- Sys.time()
+fit_tre <- train(delic_binary3 ~ .,
+                 data      = training,
+                 trControl = cv, 
+                 method    = "rpart", 
+                 metric    = "Kappa")
+t1 <- Sys.time()
+
+
+
+fit_glm <- train(delic_binary3 ~ .,
+                 data      = training,
+                 trControl = cv, 
+                 method    = "glm",
+                 family    = "binomial",
+                 metric    = "Kappa")
+t2 <- Sys.time()
+fit_bag <- train(delic_binary3 ~ .,
+                 data      = training,
+                 trControl = cv,
+                 nbagg     = 5,
+                 method    = "treebag",
+                 metric    = "Kappa")
+t3 <- Sys.time()
+fit_raf <- train(delic_binary3 ~ .,
+                 data      = training,
+                 trControl = cv,
+                 ntree     = 30, 
+                 method    = "rf",
+                 metric    = "Kappa")
+t4 <- Sys.time()
+#fit_lda <- train(delic_binary3 ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "lda",
+#                 metric    = "Kappa")
+t5 <- Sys.time()
+fit_net <- train(delic_binary3 ~ .,
+                 data      = training,
+                 trControl = cv, 
+                 method    = "glmnet",
+                 metric    = "Kappa")
+t6 <- Sys.time()
+#fit_knn <- train(delic_binary3     ~ .,
+#                 data      = training,
+#                 trControl = cv, 
+#                 method    = "kknn",
+#                 metric    = "ROC")
+t7 <- Sys.time()
+fit_xgb <- train(delic_binary3     ~ .,
+                 data      = training,
+                 trControl = cv, 
+                 method    = "xgbTree",
+                 metric    = "Kappa")
+t8 <- Sys.time()
+#fit_svm <- train(delic_binary3     ~ .,
+#   data      = training,
+#   trControl = cv, 
+#   method    = "svmLinear",
+#   metric    = "Kappa")
+t9 <- Sys.time()
+
+table(predict(fit_glm,  newdata=test), test$delic_binary3)
