@@ -108,20 +108,29 @@ Plots on full data 3
 Keras on full data
 ========================================================
 
-```{r fig.height=6, fig.width=16, message=FALSE, warning=FALSE}
+```{r eval=FALSE, fig.height=6, fig.width=16, message=FALSE, warning=FALSE, include=FALSE}
+ setwd("~/GitHub/SingleLoanDataset")
+
 library(tidyverse)
 library(ggthemes)
 load("xgb_thold.jpg")
 load("net_thold.jpg")
-aa <- rbind(net_thold, xgb_thold)
+
+sspec <- function(x,b) {rbind(spec(x), precision(x), accuracy(x), recall(x), npv(x)) %>% mutate(model = b)}
+
+keras_thold <- sspec(table(pred>0.2287, y_test),"keras")
+
+aa <- rbind(net_thold, xgb_thold, keras_thold)
 
 ggplot(aa, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
   geom_col(position="dodge", width = 0.6) + 
   scale_fill_tableau(palette = "Miller Stone", type = "regular") + 
   labs(title="Model performance at specificity = 50%" , 
        fill="Predictive Models\nordered by performance")
-
 ```
+
+
+![alt text](keras_plot.png "plot")
 
 
 
@@ -143,8 +152,18 @@ Fannie Mae dataset
  - Additional creditscores
  - Dropout reasons
 
+Fannie Mae dataset
+========================================================
 
 
 
+![alt text](ker.png "plot")
+
+
+Fannie Mae dataset
+========================================================
+
+
+![alt text](plot_cloudml.png "plot")
 
 

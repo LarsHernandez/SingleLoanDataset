@@ -136,21 +136,9 @@ Keras on full data
 ========================================================
 
 
-```r
-library(tidyverse)
-library(ggthemes)
-load("xgb_thold.jpg")
-load("net_thold.jpg")
-aa <- rbind(net_thold, xgb_thold)
 
-ggplot(aa, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) + 
-  geom_col(position="dodge", width = 0.6) + 
-  scale_fill_tableau(palette = "Miller Stone", type = "regular") + 
-  labs(title="Model performance at specificity = 50%" , 
-       fill="Predictive Models\nordered by performance")
-```
 
-![plot of chunk unnamed-chunk-5](exam_slides-figure/unnamed-chunk-5-1.png)
+![alt text](keras_plot.png "plot")
 
 
 
@@ -172,8 +160,18 @@ Fannie Mae dataset
  - Additional creditscores
  - Dropout reasons
 
+Fannie Mae dataset
+========================================================
 
 
 
+![alt text](ker.png "plot")
+
+
+Fannie Mae dataset
+========================================================
+
+
+![alt text](plot_cloudml.png "plot")
 
 
