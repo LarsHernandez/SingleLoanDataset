@@ -1,0 +1,762 @@
+---
+title: "Untitled"
+output: html_document
+---
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(patchwork)
+library(openintro) #get state from abbr
+library(scales)
+library(tidygraph)
+library(ggraph)
+library(caret)
+library(stargazer)
+library(ggthemes)
+library(maps)
+library(lubridate)
+library(factoextra)
+
+load("Total.rdata")
+load("jess/Total2.rdata")
+load("../total_full_q1.rdata")
+
+data   <- subset(total, !(state %in% c("VI", "GU", "PR", "DC")))
+Total2 <- Total2 %>% filter(!(state %in% c("VI","PR","GU","DC")))
+
+```
+
+```{r}
+# Theme -------------------------------------------------------------------
+base   <- "#08306b"
+basem1 <- "#4f6980"
+basem2 <- "#849db1"
+
+
+thd <- theme(plot.title        = element_text(size  = 10),
+             plot.background   = element_rect(fill  = "#f3f3f3", color = "#f3f3f3"),
+             panel.background  = element_rect(fill  = "#f3f3f3", color = NA), 
+             legend.background = element_rect(fill  = "#f3f3f3", color = NA),
+             legend.key        = element_rect(fill  = "#f3f3f3", color = NA),
+             strip.background  = element_rect(fill  = "#f3f3f3", color = NA),
+             panel.border      = element_rect(fill  = NA,        color = "black", size = 0.3),
+             panel.grid.major  = element_line(color ="grey90"), 
+             panel.grid.minor  = element_line(color ="grey90"), 
+             title             = element_text(color = "black"),
+             plot.subtitle     = element_text(color = "grey40"),
+             plot.caption      = element_text(color = "grey70"),
+             strip.text        = element_text(face  = "bold"),
+             axis.text         = element_text(color = "black"),
+             axis.ticks        = element_line(color = "black"))
+
+th <- thd + theme(panel.grid.major  = element_blank(), 
+                  panel.grid.minor  = element_blank())
+
+an <- plot_annotation(theme = theme(plot.margin     = unit(c(0.5, 0.5, 0.5, 0.5), "cm"),
+                                    plot.background = element_rect(fill = "#f3f3f3", color = "#f3f3f3")))
+```
+
+
+```{r eval=FALSE, include=FALSE}
+total %>% 
+  as.data.frame() %>% 
+  stargazer(digits = 1, decimal.mark = ",", digit.separator = ".")
+```
+
+
+
+
+
+```{r fig.height=5, fig.width=12, message=FALSE, warning=FALSE}
+# Experiment --------------------------------------------------------------
+p_date <- data %>% count(date,delic_binary) %>% ggplot(aes(date, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
+  labs(title="Origination", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+p_matu <- data %>% count(maturity,delic_binary) %>% ggplot(aes(maturity, n/1000)) + geom_col(aes(color=delic_binary, fill=delic_binary), show.legend = F) + 
+  labs(title="Maturity", x = NULL, y = NULL) + th + scale_y_continuous(limits=c(0,6.5)) +
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+p_stat <- data %>% count(state,delic_binary) %>% filter(!is.na(delic_binary)) %>% ggplot(aes(reorder(state,n), n/1000)) + geom_col(aes(fill=delic_binary)) + 
+  labs(title="State", x = NULL, y = NULL, fill="Delinquent") + th + 
+  scale_color_manual(values = c(basem1, basem2)) + scale_fill_manual(values = c(basem1, basem2))
+
+a1 <- p_date + p_matu + p_stat + plot_layout(guides="collect", design = "12\n33") + an 
+a1
+
+p_insu <- data %>% count(insurance_pct,delic_binary) %>% filter(n>50) %>% ggplot(aes(reorder(insurance_pct, as.numeric(insurance_pct)),n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Insurance Percentage", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_unit <- data %>% count(units,delic_binary) %>% ggplot(aes(units, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Number of Units", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_ocus <- data %>% count(ocu_status,delic_binary) %>% ggplot(aes(ocu_status, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Ocupancy Status", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_newh <- data %>% filter(new_homeowner != 9) %>% count(new_homeowner,delic_binary) %>% ggplot(aes(new_homeowner, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="New Homeowner", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_chan <- data %>% count(channel,delic_binary) %>% ggplot(aes(channel, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Channel", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_pmmm <- data %>% count(ppm,delic_binary) %>% ggplot(aes(ppm, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="PPM", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_type <- data %>% count(loan_type,delic_binary) %>% ggplot(aes(loan_type, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Loan Type", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_ptyp <- data %>% count(property_type,delic_binary) %>% ggplot(aes(property_type, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Property Type", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_purp <- data %>% count(loan_purpose,delic_binary) %>% ggplot(aes(loan_purpose, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F)+ labs(title="Purpose of Loan", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_term <- data %>% count(term,delic_binary) %>% filter(n>200) %>% ggplot(aes(as.factor(term), n/1000)) + geom_col(aes(fill=delic_binary))+ labs(title="Number of Terms", x = NULL, y = NULL, fill="Delinquent") + th+ scale_fill_manual(values = c(basem1, basem2))
+p_borr <- data %>% filter(n_borrowers != 99) %>% count(n_borrowers,delic_binary) %>% ggplot(aes(n_borrowers, n/1000)) + geom_col(aes(fill=delic_binary), show.legend = F) + labs(title="Number of Borrowers", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+
+a2 <- p_chan + p_type + p_purp  + p_borr + p_ocus + p_newh + p_term + p_insu + p_ptyp + plot_layout(guides="collect", design = "123456\n778899") + an
+a2
+
+p_cred <- data %>% filter(credit_score != 9999,!is.na(delic_binary)) %>% ggplot(aes(credit_score)) + geom_histogram(bins=100, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Credit Score", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_cltv <- data %>% filter(com_loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(com_loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Complete Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_nltv <- data %>% filter(loan_to_value != 999,!is.na(delic_binary)) %>% ggplot(aes(loan_to_value)) + geom_histogram(bins=100, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Loan to Value", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_dtin <- data %>% filter(debt_to_income != 999,!is.na(delic_binary)) %>% ggplot(aes(debt_to_income)) + geom_histogram(bins=60, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Debt to Income", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_upba <- data %>% filter(!is.na(delic_binary)) %>% ggplot(aes(upb)) + geom_histogram(bins=100, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Unpaid Balance", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+p_rate <- data %>% filter(!is.na(delic_binary)) %>% ggplot(aes(rate)) + geom_histogram(bins=40, aes(fill=delic_binary, y=..count../1000)) + labs(fill = "Delinquent", title="Interestrate", x = NULL, y = NULL) + th+ scale_fill_manual(values = c(basem1, basem2))
+
+a3 <- p_cred + p_cltv + p_nltv + p_dtin + p_upba + p_rate + plot_layout(nrow=2, guides = "collect") + an
+a3
+
+topsell <- data %>% count(seller) %>% top_n(20)
+topserv <- data %>% count(servicer) %>% top_n(20)
+p_sell <- data %>% filter(!is.na(delic_binary))%>% count(seller, delic_binary) %>% filter(seller %in% topsell$seller) %>% ggplot(aes(reorder(seller,n), n/1000)) + 
+  geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Seller", x = NULL,fill = "Delinquent",y=NULL) + th + scale_fill_manual(values = c(basem1, basem2)) + scale_y_continuous(limits = c(0,250))
+p_serv <- data %>% filter(!is.na(delic_binary)) %>% count(servicer, delic_binary) %>% filter(servicer %in% topserv$servicer) %>% ggplot(aes(reorder(servicer,n), n/1000)) + 
+  geom_col(aes(fill=delic_binary)) + coord_flip() + labs(title = "Servicer", x = NULL,fill = "Delinquent",y=NULL) + th + scale_fill_manual(values = c(basem1, basem2))+ scale_y_continuous(limits = c(0,250))
+
+a4 <- p_sell + p_serv + an + plot_layout(guides = "collect")
+a4
+```
+
+
+
+
+
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE}
+m1a <- data %>% group_by(seller) %>% filter(n() > 5000) %>% mutate(nn = n()) %>% 
+  group_by(delic_binary, add=TRUE) %>% 
+  summarize(per = mean(100*n()/nn),
+            n = n()) %>% 
+  select(seller, per, delic_binary, n) %>% 
+  filter(delic_binary == TRUE) %>% 
+  ggplot(aes(reorder(seller, per), per)) + 
+  geom_col(fill=basem1) +
+  geom_text(aes(label = n, y=per-1.5), color="white", size=2.5) +
+  coord_flip() +
+  scale_y_continuous(limits=c(0,36)) +
+  labs(title="Seller", x=NULL, y=NULL) + th + an
+
+m1b <- data %>% group_by(state) %>% filter(n() > 5000) %>% mutate(nn = n()) %>% 
+  group_by(delic_binary, add=TRUE) %>% 
+  summarize(per = mean(100*n()/nn),
+            n = n()) %>% 
+  select(state, per, delic_binary, n) %>% 
+  filter(delic_binary == TRUE) %>% 
+  ggplot(aes(reorder(state, per), per)) + 
+  geom_col(fill=basem1) +
+  geom_text(aes(label = n, y=per-1.5), color="white", size=2.5) +
+  coord_flip() +
+  scale_y_continuous(limits=c(0,36)) +
+  labs(title="State", x=NULL, y=NULL) + th + an
+
+m5 <- m1a + m1b
+m5
+```
+
+
+
+
+
+
+
+```{r fig.height=5, fig.width=12, message=FALSE, warning=FALSE}
+
+m1a <- data %>% filter(credit_score != 9999, credit_score > 400, !is.na(delic_binary)) %>% sample_n(60000) %>% 
+  ggplot(aes(credit_score, rate, fill=delic_binary)) + 
+  stat_density_2d(aes(alpha = stat(level)), geom = "polygon", show.legend = F) +
+  facet_wrap(~delic_binary, nrow=2) +
+  scale_fill_manual(values = c(basem1, basem2)) +
+  labs(title=NULL, x="Creditscore", y=NULL) + th
+
+m1b <- data %>% filter(credit_score != 9999, credit_score > 400, !is.na(delic_binary)) %>% sample_n(60000) %>% 
+  ggplot(aes(credit_score, rate, color = delic_binary)) + 
+  geom_jitter(width = 0.2, height = 0.2, size=1.5, alpha = 0.4) + 
+  geom_smooth(method = "lm", se = F) +
+  scale_color_manual(values = c(basem1, basem2)) +
+  labs(title=NULL, x="Creditscore", y="Rate", color="Delinquent") + th
+
+m1 <- m1b + m1a + an
+
+m2 <- data %>% group_by(delic_date, state) %>% summarize(n = sum(delic_binary)) %>% 
+  ggplot(aes(delic_date, n)) + 
+  geom_point(alpha=0.1) +
+  geom_smooth(span = 0.25, color=basem1, fill=basem2, alpha=0.5) +
+  scale_x_date(date_breaks = "5 year", labels = date_format("%Y")) +
+  facet_wrap(~state, scales="free_y", nrow=5) + th + an +
+  labs(x=NULL, y=NULL)
+
+edf <- tibble(xmin = c(as.Date("2001-11-01"), as.Date("2009-06-01")),
+              xmax = c(as.Date("2001-03-01"), as.Date("2007-12-01")),
+              ymin = c(-Inf, -Inf),
+              ymax = c(Inf, Inf))
+
+m3 <- data %>% group_by(delic_date) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  ggplot(aes(delic_date, n)) +  
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.2, inherit.aes = F) +
+  geom_point(alpha=0.3) +
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(span = 0.15, color=basem1, fill=basem2) + 
+  labs(x=NULL, y=NULL) +
+  thd + an
+
+p_sca1 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "4 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency binary", x=NULL,y=NULL) +
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.1, inherit.aes = F) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey80", se=F) + thd 
+
+p_sca2 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_mean)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA")) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  mutate(n = scale(n)) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "4 year", labels = date_format("%Y")) +
+  labs(title="scaled delicenquency sum", x=NULL,y=NULL) +
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.1, inherit.aes = F) +
+  ylim(-2,4) +
+  geom_smooth(span = 0.25, fill="grey90", se=F) + thd 
+
+p_sca3 <- data %>% group_by(delic_date, state) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  filter(state %in% c("CA", "TX", "FL", "NY", "PA")) %>% 
+  ggplot(aes(delic_date, n, color=state)) + 
+  scale_color_tableau(palette = "Miller Stone", type = "regular") + 
+  scale_x_date(date_breaks = "6 year", labels = date_format("%Y"), date_minor_breaks = "2 year") +
+  geom_point(alpha=0.3, show.legend = F) +
+  geom_smooth(aes(color=state),show.legend = F, span = 0.25) + th + 
+  theme(strip.background = element_blank(), strip.text = element_blank()) +
+  facet_wrap(~state, nrow=1) + 
+  scale_y_continuous(limits=c(0,150)) +
+  labs(x=NULL, y=NULL, title = "Delinquency binary by 5 most populous states")
+
+m4 <- (p_sca3 | (p_sca1 / p_sca2 + plot_layout(guides = "collect"))) + an + plot_layout(widths = c(1.8, 1))
+
+m1;m2;m3;m4
+
+
+```
+
+
+
+
+```{r fig.height=6, fig.width=12, message=FALSE, warning=FALSE}
+# Network analsis ---------------------------------------------------------
+
+set.seed(1)
+p_net1 <- data %>% group_by(seller, servicer) %>% 
+  filter(n() > 1500) %>% 
+  ungroup() %>% 
+  distinct(seller, servicer) %>% 
+  as_tbl_graph() %>% 
+  mutate(Centrality = centrality_degree(mode = 'in')) %>% 
+  ggraph(layout = "nicely") + 
+  geom_edge_fan(color="grey") + 
+  geom_node_point(aes(size = Centrality), color=basem1) + 
+  geom_node_text(aes(label=ifelse(Centrality >= 1, name, NA)), size=2, nudge_y = 0.35) + 
+  scale_size_continuous(breaks=c(1,3,6,9)) + 
+  labs(title="Centrality by servicer", x=NULL, y=NULL) +
+  th + theme(legend.position = "bottom")
+
+set.seed(1)
+p_net2 <- data %>% group_by(seller, servicer) %>% 
+  filter(n() > 1500) %>% 
+  ungroup() %>% 
+  distinct(seller, servicer) %>% 
+  as_tbl_graph() %>% 
+  mutate(Centrality = centrality_degree(mode = 'out')) %>% 
+  ggraph(layout = "nicely") + 
+  geom_edge_fan(color="grey") + 
+  geom_node_point(aes(size = Centrality), color=basem1) + 
+  geom_node_text(aes(label=ifelse(Centrality >= 1, name, NA)), size=2, nudge_y = 0.35) + 
+  scale_size_continuous(breaks=c(1,3,6,9)) + 
+  labs(title="Centrality by seller", x=NULL, y=NULL) +
+  th + theme(legend.position = "bottom")
+
+n1 <- p_net1 + p_net2 + an
+
+set.seed(1)
+
+
+p_n2 <- data %>% 
+  group_by(seller, servicer) %>% 
+  summarize(n = n()) %>% 
+  ungroup() %>% 
+  filter(seller != "Other sellers", 
+         servicer != "Other servicers", 
+         n > 500) %>% 
+  as_tbl_graph() %>% 
+  ggraph(layout = "nicely") + 
+  geom_edge_fan(aes(width=n), alpha=0.3) + 
+  geom_node_point(color=basem1, size=5) + 
+  geom_node_text(aes(label=name), size=2, nudge_y = 0.7) + 
+  labs(title="Edge size by number of connections", x=NULL, y=NULL) +
+  th
+
+p_n3 <- data %>% group_by(seller) %>% mutate(n = n()) %>% 
+  filter(n>7000, !is.na(income)) %>% 
+  ungroup() %>% 
+  mutate(seller = as.factor(seller)) %>% 
+  ggplot(aes(x = reorder(seller, income, FUN = median), y = income)) + 
+  geom_boxplot(outlier.shape = NA, fill=basem1) + coord_flip() + 
+  labs(title="Income by seller", x=NULL, y=NULL) + 
+  ylim(0,5000) +
+  th
+
+n2 <- p_n2 + p_n3 + an + plot_layout(widths = c(2.8, 1))
+
+n1;n2
+```
+
+
+
+
+
+
+
+```{r fig.height=5, fig.width=12}
+His_p <- Total2 %>% filter(!is.na(Hispanic), !is.na(delic_binary)) %>% ggplot(aes(Hispanic)) +
+  geom_histogram(aes(y=..density.., fill=delic_binary),bins=50) + facet_wrap(~delic_binary, nrow=2)  +
+  geom_vline(data = subset(Total2, delic_binary), aes(xintercept = mean(Hispanic, na.rm=T)), linetype ="dashed", color ="black") +
+  geom_vline(data = subset(Total2, !delic_binary), aes(xintercept = mean(Hispanic, na.rm=T)), linetype ="dashed", color ="black") + th +
+  scale_fill_manual(values = c(basem1, basem2)) +
+  theme(strip.background = element_blank(), strip.text = element_blank()) +
+  labs(title = "Latino population in MSA", x=NULL, y=NULL, fill = "Delinquent")
+
+Bl_p <- Total2 %>% filter(!is.na(Black), !is.na(delic_binary)) %>% ggplot(aes(Black)) +
+  geom_histogram(aes(y=..density.., fill=delic_binary),bins=50) + facet_wrap(~delic_binary, nrow=2)  +
+  geom_vline(data = subset(Total2, delic_binary), aes(xintercept = mean(Black, na.rm=T)), linetype ="dashed", color ="black") +
+  geom_vline(data = subset(Total2, !delic_binary), aes(xintercept = mean(Black, na.rm=T)), linetype ="dashed", color ="black") + th +
+  scale_fill_manual(values = c(basem1, basem2)) +
+  theme(strip.background = element_blank(), strip.text = element_blank()) +
+  labs(title = "Black population in MSA", x=NULL, y=NULL, fill = "Delinquent")
+
+Inc_p <- Total2 %>% filter(!is.na(median_income2015), !is.na(delic_binary)) %>% ggplot(aes(median_income2015)) +
+  geom_histogram(aes(y=..density.., fill=delic_binary),bins=50) + facet_wrap(~delic_binary, nrow=2)  +
+  geom_vline(data = subset(Total2, delic_binary), aes(xintercept = mean(median_income2015, na.rm=T)), linetype ="dashed", color ="black") +
+  geom_vline(data = subset(Total2, !delic_binary), aes(xintercept = mean(median_income2015, na.rm=T)), linetype ="dashed", color ="black") + th +
+  scale_fill_manual(values = c(basem1, basem2)) +
+  theme(strip.background = element_blank(), strip.text = element_blank()) +
+  labs(title = "Median income in MSA", x=NULL, y=NULL, fill = "Delinquent")
+
+j1 <- (His_p + Bl_p + Inc_p + plot_layout(nrow=1, guides = "collect")) + an
+
+j1
+```
+
+```{r fig.height=5, fig.width=12}
+p_j1 <- Total2 %>% 
+  group_by(area) %>% 
+  summarize_all(first) %>% 
+  select(Hispanic, Black, White, Native, Hawaiian, Asian, Other) %>% 
+  gather(variable, value) %>% 
+  mutate(value = as.numeric(value)/100) %>% 
+  ggplot(aes(value, x=1)) + 
+  geom_violin(trim = F, fill=basem1, color=NA) + 
+  geom_point(alpha=0.1, size=1) +
+  facet_wrap(~variable, nrow=1) +
+  scale_y_continuous(labels=percent, breaks=c(0,0.2,0.4,0.6,0.8,1)) +
+  scale_x_continuous(breaks=NULL) +
+  labs(x=NULL, y=NULL) +
+  th + an
+
+p_j2 <- Total2 %>%   
+  group_by(area) %>% 
+  summarize_all(first) %>% 
+  ggplot(aes(pop)) + 
+  geom_density(bins=100, fill=basem1, color=NA) + 
+  scale_x_log10(breaks = scales::trans_breaks("log10", function(x) 10^x),
+                labels = scales::trans_format("log10", scales::math_format(10^.x))) + 
+  labs(x=NULL, title="Population of each MSA") +
+  th
+
+
+j2 <- p_j2 + p_j1 + plot_layout(nrow=2,heights = c(1,2)) + an
+j2
+
+
+p_j3a <- Total2 %>%   
+  filter(credit_score < 2000) %>% 
+  group_by(area) %>% 
+  summarize(Black = mean(Black),
+            credit_score = mean(credit_score)) %>% 
+  ggplot(aes(x=Black, y=credit_score)) + geom_point(alpha=0.5) + geom_smooth(method="lm", color=basem1, fill=basem2) + 
+  labs(x="Blacks", y="Credit Score") +
+  th
+p_j3b <- Total2 %>%   
+  filter(credit_score < 2000) %>% 
+  group_by(area) %>% 
+  summarize(Hispanic = mean(Hispanic),
+            credit_score = mean(credit_score)) %>% 
+  ggplot(aes(x=Hispanic, y=credit_score)) + geom_point(alpha=0.5) + geom_smooth(method="lm", color=basem1, fill=basem2) + 
+  labs(x="Hispanic", y="Credit Score") +
+  th
+p_j3c <- Total2 %>%   
+  filter(credit_score < 2000) %>% 
+  group_by(area) %>% 
+  summarize(Asian = mean(Asian),
+            credit_score = mean(credit_score)) %>% 
+  ggplot(aes(x=Asian, y=credit_score)) + geom_point(alpha=0.5) + geom_smooth(method="lm", color=basem1, fill=basem2) + 
+  labs(x="Asian", y="Credit Score") +
+  th
+p_j3d <- Total2 %>%   
+  filter(credit_score < 2000) %>% 
+  group_by(area) %>% 
+  summarize(White = mean(White),
+            credit_score = mean(credit_score)) %>% 
+  ggplot(aes(x=White, y=credit_score)) + geom_point(alpha=0.5) + geom_smooth(method="lm", color=basem1, fill=basem2) + 
+  labs(x="White", y="Credit Score") +
+  th
+
+j3 <- p_j3a + p_j3b + p_j3c + p_j3d +plot_layout(nrow=1) + an
+j3
+```
+
+
+
+
+
+
+```{r fig.height=5, fig.width=12, message=FALSE, warning=FALSE}
+# US map ------------------------------------------------------------------
+states_map <- map_data("state")
+
+states <- data.frame(state.center, state.abb) %>%
+  rename(state = "state.abb")
+
+u1 <- Total2 %>% group_by(state, Spop2018) %>% summarize(n=n()) %>% mutate(ratio = n/Spop2018) %>%
+  mutate(region = tolower(abbr2state(state))) %>%
+  left_join(states , by= "state") %>% 
+  ggplot(aes(map_id = region)) +
+  geom_map(aes(fill = ratio*100), map = states_map, color = "black", size=0.1) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(title="Location of loans relative to population",x=NULL, y=NULL, fill="Loans by state\npopulation") +
+  scale_fill_viridis_c(option = "inferno", breaks=c(0.2,0.3,0.4,0.5), labels= c("0.2%","0.3%","0.4%","0.5%")) +
+    scale_fill_gradientn(colors=c("black", basem1, "white"), values = rescale(c(0, 0.2,0.3,0.4,0.5)), breaks=c(0.2,0.3,0.4,0.5), labels= c("0.2%","0.3%","0.4%","0.5%")) +
+  geom_text(aes(x = x, y = y, label = round(ratio*100,2)), color="white", size=2) +
+  theme(axis.title=element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+
+
+u2 <- Total2 %>% 
+  filter(!is.na(delic_binary)) %>% 
+  group_by(state) %>% 
+  mutate(nn = n()) %>% 
+  group_by(delic_binary, add=TRUE) %>% 
+  summarize(pct = mean(100 * n() / nn)) %>% 
+  filter(pct<80) %>% 
+  ungroup() %>% 
+  group_by(state) %>% 
+  summarize(pct = last(pct)) %>%
+  mutate(region = tolower(abbr2state(state)))  %>%
+  left_join(states , by= "state") %>% 
+  ggplot(aes(map_id = region)) +
+  geom_map(aes(fill = pct), map = states_map, color = "black", size=0.1) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(title="Location of problems",x=NULL, y=NULL, fill="Defaulting\nloans") +
+  scale_fill_viridis_c(option = "inferno", breaks=c(10,15,20), labels= c("10%","15%","20%")) +
+  scale_fill_gradientn(colors=c("black", basem1, "white"), values = rescale(c(0,4,8,9,16)), breaks=c(10,15,20), labels= c("10%","15%","20%")) +
+  geom_text(aes(x = x, y = y, label = round(pct,1)), color="white", size=2) +
+  theme(axis.title=element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+
+u1 <- u1 + u2 + an
+u1
+```
+
+
+
+
+
+
+
+
+```{r fig.height=7, fig.width=12, message=FALSE, warning=FALSE}
+u3 <- Total2 %>% 
+  filter(!is.na(delic_binary)) %>% 
+  group_by(state, dataset) %>% 
+  mutate(nn = n()) %>% 
+  group_by(delic_binary, add=TRUE) %>% 
+  summarize(pct = mean(100 * n() / nn)) %>% 
+  filter(pct<80) %>% 
+  ungroup() %>% 
+  group_by(state, dataset) %>% 
+  summarize(pct = last(pct)) %>%
+  mutate(region = tolower(abbr2state(state)))  %>%
+  left_join(states , by= "state") %>% 
+  ggplot(aes(map_id = region)) +
+  geom_map(aes(fill = pct), map = states_map, color = "black", size=0.1) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(x=NULL, y=NULL, fill="Defaulting loans\nby year issued") +
+  scale_fill_viridis_c(option = "inferno", breaks=c(15,30,45), labels= c("15%","30%","45%")) +
+  scale_fill_gradientn(colors=c("black", basem1, "white"), values = rescale(c(0,13,25,32,45)), breaks=c(15,30,45), labels= c("15%","30%","45%")) +
+  facet_wrap(~dataset) + 
+  theme(axis.title=element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+
+
+u4 <- Total2 %>% 
+  filter(!is.na(delic_binary)) %>% 
+  mutate(year = ifelse(is.na(delic_date), dataset, year(delic_date))) %>% 
+  group_by(delic_binary, state) %>% 
+  mutate(nn = n()) %>% 
+  group_by(year, add=TRUE) %>% 
+  summarize(pct = mean(100 * n() / nn)) %>% 
+  filter(pct<80) %>% 
+  ungroup() %>% 
+  group_by(state, year) %>% 
+  summarize(pct = last(pct)) %>%
+  mutate(region = tolower(abbr2state(state)))  %>%
+  left_join(states , by= "state") %>% 
+  filter(year!=2019) %>% 
+  ggplot(aes(map_id = region)) +
+  geom_map(aes(fill = pct), map = states_map, color = "black", size=0.1) +
+  expand_limits(x = states_map$long, y = states_map$lat) + th +
+  labs(x=NULL, y=NULL, fill="Defaulting loans\nby year") +
+  #scale_fill_viridis_c(option = "inferno", breaks=c(5,10,15), labels= c("5%","10%","15%")) +
+  scale_fill_gradientn(colors=c("black", basem1, "white"), values = rescale(c(0,4,8,9,16)), breaks=c(5,10,15), labels= c("5%","10%","15%")) +
+  facet_wrap(~year) + 
+  theme(axis.title=element_blank(),axis.text=element_blank(),axis.ticks=element_blank())
+u4
+u3;u4
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r fig.height=5, fig.width=12}
+library(Quandl)
+FM <- Quandl("FMAC/HPI")
+
+ddf <- FM %>% gather(variable, value,-Date) %>% 
+  filter(Date > "2001-01-01")
+ddf2 <- subset(ddf, variable %in% c("CA", "TX", "FL", "NY", "PA"))
+ddf3 <- subset(ddf2, Date == "2017-12-31")
+
+f1 <- ggplot(ddf, aes(Date, value, group=variable)) + 
+  geom_line(color=basem2, alpha=0.4) +
+  geom_line(data=ddf2, color=basem1, aes(linetype=variable), show.legend = F) +
+  geom_text(data=ddf3, color=basem1, aes(label=variable, x = as.Date("2018-04-01"))) +
+  labs(title="US housing prices by state indexed in 2001", x=NULL, y=NULL) +
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.2, inherit.aes = F) + 
+  scale_y_continuous(breaks=seq(0,350, by=50), limits=c(50,350))+
+  th + an +
+  coord_cartesian(xlim=c(as.Date("2001-05-01"),as.Date("2018-01-01")))
+f1
+
+```
+
+
+
+```{r}
+p_1 <- data %>% group_by(delic_date) %>% 
+  summarize(n = sum(delic_binary)) %>% 
+  ggplot(aes(delic_date, n)) +  
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.2, inherit.aes = F) +
+  geom_point(alpha=0.3) +
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_smooth(span = 0.20, color=basem1, fill=basem2) + 
+  labs(x=NULL, y=NULL, title="Number of delinquent loans with LOESS fit") +
+  thd
+
+dat <- data %>% group_by(delic_date) %>% 
+  summarize(n = sum(delic_binary))
+
+m <- loess(dat$n ~as.numeric(as.factor(dat$delic_date)), span = 0.20)
+#m$fit %>% plot
+
+dat$fit <- c(NA, m$fit)
+
+p_2 <- dat %>% 
+  mutate(fit = fit - lag(fit)) %>% 
+  ggplot(aes(delic_date, fit)) +  
+  geom_rect(data=edf, aes(xmax=xmin, ymax=ymax, xmin=xmax, ymin=ymin), alpha=0.2, inherit.aes = F) +
+  geom_ribbon(aes(ymin=0, ymax=fit), fill=basem2, color=basem2, alpha=0.6) +
+  scale_x_date(date_breaks = "1 year", labels = date_format("%Y")) +
+  geom_line(color=basem1) +
+  labs(x=NULL, y=NULL, title ="Change in LOESS fit") +
+  thd
+
+m3 <- p_1 + p_2 + plot_layout(nrow=2, heights = c(2,1)) + an
+m3
+```
+
+
+```{r}
+pc <- Total2 %>% select(credit_score, rate, debt_to_income, income, Black, White, Hispanic, Asian) %>% drop_na() %>% sample_n(20000)
+pca <- prcomp(pc, scale. = T, rank. = 3)
+
+p_pca <- fviz_pca_biplot(pca, geom = "point", col.ind = basem2, col.var = "black") + th + an
+```
+
+
+```{r fig.height=8, fig.width=12}
+library(survival)
+library(survminer)
+
+fit <- survfit(Surv(survival, delic_binary) ~ n_borrowers, data = data)
+
+ggsurvplot(fit, 
+           data=data,
+           palette=c(basem1, basem2, "black"),
+           conf.int = TRUE,
+           pval = TRUE)
+
+
+fit <- survfit(Surv(survival, delic_binary) ~ state, data = data %>% filter(state %in% c("CA", "TX", "FL", "NY", "PA")))
+
+p <- ggsurvplot(fit,
+           data=data,
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = T,
+           palette = "Paired",
+           surv.median.line = "hv",
+           risk.table.y.text = FALSE,
+           break.time.by = 25,
+           xlim=c(0,240)
+           )
+p$plot <- p$plot + th
+p$table <- p$table + th
+p
+
+
+
+fit <- survfit(Surv(survival, delic_binary) ~ dataset, data = data)
+
+p <- ggsurvplot(fit,
+           data=data,
+           conf.int = TRUE,
+           pval = TRUE,
+           risk.table = T,
+           palette = "Paired",
+           surv.median.line = "hv",
+           risk.table.y.text = FALSE,
+           break.time.by = 25,
+           xlim=c(0,240),
+           censor=F
+           )
+p$plot <- p$plot + th
+p$table <- p$table + th
+p
+
+
+```
+
+
+
+
+
+
+```{r}
+ggsave(a1, filename = "plots/a1.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(a2, filename = "plots/a2.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(a3, filename = "plots/a3.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(a4, filename = "plots/a4.pdf", width = 12, height = 5,  dpi = 300)
+
+ggsave(m1, filename = "plots/m1.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(m2, filename = "plots/m2.pdf", width = 20, height = 12, dpi = 300)
+ggsave(m3, filename = "plots/m3.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(m4, filename = "plots/m4.pdf", width = 14, height = 6,  dpi = 300)
+ggsave(m5, filename = "plots/m5.pdf", width = 12, height = 7,  dpi = 300)
+
+ggsave(n1, filename = "plots/n1.pdf", width = 12, height = 6,  dpi = 300)
+ggsave(n2, filename = "plots/n2.pdf", width = 12, height = 6,  dpi = 300)
+
+ggsave(j1, filename = "plots/j1.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(j2, filename = "plots/j2.pdf", width = 12, height = 5,  dpi = 300)
+ggsave(j3, filename = "plots/j3.pdf", width = 12, height = 3,  dpi = 300)
+
+ggsave(u1, filename = "plots/u1.pdf", width = 12, height = 4,  dpi = 300)
+ggsave(u3, filename = "plots/u3.pdf", width = 16, height = 9,  dpi = 300)
+ggsave(u4, filename = "plots/u4.pdf", width = 16, height = 9,  dpi = 300)
+
+ggsave(f1, filename = "plots/f1.pdf", width = 12, height = 5,  dpi = 300)
+
+ggsave(p_pca, filename = "plots/pca.pdf", width = 12, height = 5,  dpi = 300)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

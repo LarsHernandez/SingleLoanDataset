@@ -13,12 +13,12 @@ library(mice)
 library(recipes)
 
 
-load("Total.rdata")
+load("../Total.rdata")
 data <- subset(total, !(state %in% c("VI", "GU", "PR")))
 
 
-fit <- glm(delic_binary ~ delic_binary+credit_score+new_homeowner+state+channel+loan_purpose+debt_to_income, data = total, family = "binomial")
-apply(data, MARGIN=2, FUN=function(x) sum(is.na(x)))
+#fit <- glm(delic_binary ~ delic_binary+credit_score+new_homeowner+state+channel+loan_purpose+debt_to_income, data = total, family = "binomial")
+#apply(data, MARGIN=2, FUN=function(x) sum(is.na(x)))
 
 
 # Data --------------------------------------------------------------------
@@ -64,6 +64,26 @@ test           <- bake(prepped_recipe, test)
 
 #predict -----------------------------------------------------------------
 
+
+sspec <- function(x,b) {rbind(spec(x), precision(x), accuracy(x), recall(x), npv(x)) %>% mutate(model = b)}
+
+
+pred <- predict(fit_net, newdata=test, type = "prob")
+table(as.numeric(pred$"FALSE") < 0.6, na.omit(test)$delic_binary)
+length(na.omit(test$delic_binary))
+
+vec <- seq(0,1,by=0.01)
+vec <- c(0.5,0.6)
+df <- sspec(table(as.numeric(pred$"FALSE") < 0.5, na.omit(test)$delic_binary), "a")
+
+
+
+vec <- seq(0.2,0.9,by=0.01)
+fin <- NULL
+for (i in vec) {
+  res <- sspec(table(as.numeric(pred$"FALSE") < i, na.omit(test)$delic_binary),i)
+  fin <- rbind(fin, res)
+}
 
 
 
