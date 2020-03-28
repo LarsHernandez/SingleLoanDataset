@@ -105,7 +105,15 @@ Plots on full data 3
 
 ![alt text](a4-1.png "plot")
 
-Keras on full data
+
+Challenges with full data
+========================================================
+
+ - memmory constraints
+ - One hot encoding (dummy) missing classes
+
+
+Model on full data
 ========================================================
 
 ```{r eval=FALSE, fig.height=6, fig.width=16, message=FALSE, warning=FALSE, include=FALSE}
@@ -129,9 +137,7 @@ ggplot(aa, aes(.metric, .estimate, fill = reorder(model, desc(.estimate)))) +
        fill="Predictive Models\nordered by performance")
 ```
 
-
 ![alt text](keras_plot.png "plot")
-
 
 
 Improvements
@@ -152,17 +158,14 @@ Fannie Mae dataset
  - Additional creditscores
  - Dropout reasons
 
-Fannie Mae dataset
+CloudML
 ========================================================
-
-
 
 ![alt text](ker.png "plot")
 
 
-Fannie Mae dataset
+CloudML
 ========================================================
-
 
 ![alt text](plot_cloudml.png "plot")
 

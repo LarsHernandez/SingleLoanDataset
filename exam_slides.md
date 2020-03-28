@@ -132,14 +132,20 @@ Plots on full data 3
 
 ![alt text](a4-1.png "plot")
 
-Keras on full data
+
+Challenges with full data
+========================================================
+
+ - memmory constraints
+ - One hot encoding (dummy) missing classes
+
+
+Model on full data
 ========================================================
 
 
 
-
 ![alt text](keras_plot.png "plot")
-
 
 
 Improvements
@@ -160,17 +166,14 @@ Fannie Mae dataset
  - Additional creditscores
  - Dropout reasons
 
-Fannie Mae dataset
+CloudML
 ========================================================
-
-
 
 ![alt text](ker.png "plot")
 
 
-Fannie Mae dataset
+CloudML
 ========================================================
-
 
 ![alt text](plot_cloudml.png "plot")
 
